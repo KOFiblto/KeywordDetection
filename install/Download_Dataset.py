@@ -21,42 +21,41 @@ def main():
         print("Download aborted by user.")
         sys.exit(0)
 
-    # Ensure kaggle package is installed
     try:
-        import kaggle
+        import importlib.util
+        if importlib.util.find_spec("kaggle") is None:
+            raise ImportError
     except ImportError:
         print("Installing required 'kaggle' package...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "kaggle", "-q"])
 
-    # Handle credentials securely
-    username = os.environ.get("KAGGLE_USERNAME")
-    if not username:
-        username = input("Enter Kaggle Username: ").strip()
+    username = input("Enter Kaggle Username: ").strip()
+    key = getpass.getpass("Enter Kaggle API Key (input will be hidden): ").strip()
 
-    key = os.environ.get("KAGGLE_KEY")
-    if not key:
-        key = getpass.getpass("Enter Kaggle API Key (input will be hidden): ").strip()
-
-    # Set environment variables for the Kaggle API authentication
     os.environ["KAGGLE_USERNAME"] = username
     os.environ["KAGGLE_KEY"] = key
 
-    # Import KaggleApi after setting environment variables
     from kaggle.api.kaggle_api_extended import KaggleApi
 
-    api = KaggleApi()
-    
     try:
+        print("Attempting authentication...")
+        api = KaggleApi()
         api.authenticate()
+        print("Authentication successful.")
     except Exception as e:
         print(f"Authentication failed. Please check your credentials. Error: {e}")
         sys.exit(1)
 
-    print(f"\nDownloading dataset (~2GB)...")
+    print(f"\nDownloading dataset (~1.4GB)...")
     print("A progress bar will appear below shortly.")
     try:
-        # dataset_download_cli includes a built-in progress bar
-        api.dataset_download_cli(DATASET)
+        # Reverted to dataset_download_cli to restore the progress bar
+        api.dataset_download_cli(DATASET, path=".", unzip=False)
+        
+        slug_zip = DATASET.split('/')[-1] + ".zip"
+        if os.path.exists(slug_zip) and slug_zip != ZIP_FILE:
+            os.rename(slug_zip, ZIP_FILE)
+            
     except Exception as e:
         print(f"Download failed. Error: {e}")
         sys.exit(1)
@@ -66,11 +65,11 @@ def main():
     
     try:
         with zipfile.ZipFile(ZIP_FILE, 'r') as zip_ref:
-            # Filter files to only extract the required keywords
             files_to_extract = [
                 f for f in zip_ref.namelist() 
                 if any(f.startswith(f"{word}/") for word in KEYWORDS)
             ]
+           
             
             if not files_to_extract:
                 print("Warning: No files matched the specified keywords.")
@@ -80,7 +79,6 @@ def main():
         print(f"Error: {ZIP_FILE} not found. The download may have failed.")
         sys.exit(1)
 
-    # Clean up the archive
     print("Cleaning up temporary files...")
     if os.path.exists(ZIP_FILE):
         os.remove(ZIP_FILE)
