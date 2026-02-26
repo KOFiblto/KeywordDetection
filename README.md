@@ -30,23 +30,13 @@ The model classifies audio into one of the following categories:
 
 ## Requirements
 
-* Python 3.8+
-* PyTorch
-* Torchaudio
-* Jupyter Notebook
 
 ## Installation
 
 Install the required dependencies using pip:
 
 ```bash
-pip install torch torchaudio jupyter
+pip install -r requirements.txt
 ```
 
 ## Usage
-
-Start the Jupyter server to access and run the notebooks located in the `src/` directory:
-
-```bash
-jupyter notebook
-```
