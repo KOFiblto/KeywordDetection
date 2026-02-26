@@ -1,8 +1,3 @@
-# Windows
-Thumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -19,9 +14,8 @@ env/
 *.ckpt
 
 # Datasets and Cache
-data/
-datasets/
+dataset/
 .cache/
 
 # Audiofiles
-.wav
+*.wav
