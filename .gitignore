@@ -13,8 +13,7 @@ env/
 *.pth
 *.ckpt
 
-# Datasets and Cache
-dataset/speech_dataset/
+# Cache
 .cache/
 
 # Audiofiles

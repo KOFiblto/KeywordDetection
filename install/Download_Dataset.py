@@ -8,7 +8,7 @@ import zipfile
 KEYWORDS = ["yes", "no", "up", "down"]
 DATASET = "neehakurelli/google-speech-commands"
 ZIP_FILE = "google-speech-commands.zip"
-TARGET_DIR = "speech_dataset"
+TARGET_DIR = "../dataset"
 
 def main():
     print("This script automates downloading and extracting the dataset.")
