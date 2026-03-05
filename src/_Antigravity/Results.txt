@@ -8,3 +8,6 @@ Model Evaluation Results:
 [04_batch_normalization.py] -> Final Test Accuracy: 64.44%
 [05_weight_decay.py] -> Final Test Accuracy: 95.68%
 [06_increase_filters_and_mfcc.py] -> Final Test Accuracy: 97.68%
+[07_increase_mel_bins.py] -> Final Test Accuracy: 94.47%
+[08_increase_dropout.py] -> Final Test Accuracy: 94.68%
+[09_model_checkpointing.py] -> Final Test Accuracy: 95.42%

@@ -83,7 +83,6 @@ class KeywordCNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(64)
 
         self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
         self.fc1 = nn.Linear(64 * 4 * 4, 128)
@@ -97,7 +96,7 @@ class KeywordCNN(nn.Module):
         
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
-        x = self.dropout(F.relu(self.fc1(x)))
+        x = F.relu(self.fc1(x))
         logits = self.fc2(x)
         return logits
 

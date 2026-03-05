@@ -43,9 +43,10 @@ train_paths, test_paths, train_labels, test_labels = train_test_split(
 )
 
 class KeywordDataset(Dataset):
-    def __init__(self, paths, labels):
+    def __init__(self, paths, labels, is_training=False):
         self.paths = paths
         self.labels = labels
+        self.is_training = is_training
 
     def __len__(self):
         return len(self.paths)
@@ -68,6 +69,12 @@ class KeywordDataset(Dataset):
         elif waveform.shape[1] < NUM_SAMPLES:
             waveform = F.pad(waveform, (0, NUM_SAMPLES - waveform.shape[1]))
 
+        if self.is_training:
+            shift = random.randint(-1600, 1600)
+            waveform = torch.roll(waveform, shift, dims=-1)
+            noise = torch.randn_like(waveform) * 0.005
+            waveform = waveform + noise
+
         return waveform, torch.tensor(self.labels[idx], dtype=torch.long)
 
 class KeywordCNN(nn.Module):
@@ -76,18 +83,20 @@ class KeywordCNN(nn.Module):
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
 
         self.pool = nn.MaxPool2d(2, 2)
         self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
-        self.fc1 = nn.Linear(64 * 4 * 4, 128)
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(F.relu(self.conv4(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
         x = self.dropout(F.relu(self.fc1(x)))
@@ -95,18 +104,18 @@ class KeywordCNN(nn.Module):
         return logits
 
 def train_model():
-    train_loader = DataLoader(KeywordDataset(train_paths, train_labels), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
-    test_loader = DataLoader(KeywordDataset(test_paths, test_labels), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
+    train_loader = DataLoader(KeywordDataset(train_paths, train_labels, is_training=True), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
+    test_loader = DataLoader(KeywordDataset(test_paths, test_labels, is_training=False), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
 
     model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    # NEW logic: LR Scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3)
 
-    mel_transform = torchaudio.transforms.MelSpectrogram(
-        sample_rate=TARGET_SAMPLE_RATE, n_mels=64
+    mel_transform = torchaudio.transforms.MFCC(
+        sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
     ).to(DEVICE)
+    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=15).to(DEVICE)
+    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=35).to(DEVICE)
 
     print(f"Training on {DEVICE}...")
 
@@ -122,6 +131,8 @@ def train_model():
 
             with torch.no_grad():
                 inputs = mel_transform(inputs)
+                inputs = freq_masking(inputs)
+                inputs = time_masking(inputs)
 
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -155,9 +166,6 @@ def train_model():
         dur = time.time() - start_time
 
         print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===\n")
-        
-        # Step the scheduler
-        scheduler.step(test_acc)
 
     print("Training complete.")
 

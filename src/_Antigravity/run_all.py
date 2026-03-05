@@ -14,10 +14,19 @@ def main():
         print(f"Error: Could not find virtual env Python at {python_exe}")
         sys.exit(1)
 
-    scripts = sorted(glob.glob(os.path.join(base_dir, "0*.py")))
+    # Get all scripts matching pattern
+    scripts = sorted(glob.glob(os.path.join(base_dir, "*.py")))
+    # Filter out run_all.py itself
+    scripts = [s for s in scripts if os.path.basename(s) != "run_all.py"]
+
+    if len(sys.argv) > 1:
+        target_files = sys.argv[1:]
+        scripts = [s for s in scripts if os.path.basename(s) in target_files]
+
     results_file = os.path.join(base_dir, "Results.txt")
 
-    with open(results_file, "w") as f:
+    # Open in append mode instead of write mode to avoid overwriting
+    with open(results_file, "a") as f:
         f.write("Model Evaluation Results:\n")
         f.write("=========================\n\n")
 
