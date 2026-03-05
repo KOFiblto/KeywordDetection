@@ -64,16 +64,14 @@ class KeywordDataset(Dataset):
         if waveform.shape[0] > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
 
+        if self.is_training:
+            shift = random.randint(-1600, 1600)
+            waveform = torch.roll(waveform, shift, dims=-1)
+
         if waveform.shape[1] > NUM_SAMPLES:
             waveform = waveform[:, :NUM_SAMPLES]
         elif waveform.shape[1] < NUM_SAMPLES:
             waveform = F.pad(waveform, (0, NUM_SAMPLES - waveform.shape[1]))
-
-        if self.is_training:
-            shift = random.randint(-1600, 1600)
-            waveform = torch.roll(waveform, shift, dims=-1)
-            noise = torch.randn_like(waveform) * 0.005
-            waveform = waveform + noise
 
         return waveform, torch.tensor(self.labels[idx], dtype=torch.long)
 
@@ -111,11 +109,12 @@ def train_model():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    mel_transform = torchaudio.transforms.MFCC(
+    mfcc_transform = torchaudio.transforms.MFCC(
         sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
     ).to(DEVICE)
-    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=15).to(DEVICE)
-    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=35).to(DEVICE)
+    
+    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=10).to(DEVICE)
+    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=20).to(DEVICE)
 
     print(f"Training on {DEVICE}...")
 
@@ -130,7 +129,7 @@ def train_model():
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
 
             with torch.no_grad():
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
                 inputs = freq_masking(inputs)
                 inputs = time_masking(inputs)
 
@@ -156,7 +155,7 @@ def train_model():
         with torch.no_grad():
             for inputs, targets in test_loader:
                 inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
                 outputs = model(inputs)
                 _, predicted = outputs.max(1)
                 test_total += targets.size(0)
