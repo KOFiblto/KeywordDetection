@@ -1,0 +1,10 @@
+Model Evaluation Results:
+=========================
+
+[01_specaugment.py] -> Final Test Accuracy: 95.68%
+[02_audio_data_augmentation.py] -> Final Test Accuracy: 96.15%
+[03_lr_scheduler.py] -> Failed to find Test Accuracy. Output size: 561 chars.
+[03_lr_scheduler.py] -> Finished with errors. Check manually.
+[04_batch_normalization.py] -> Final Test Accuracy: 64.44%
+[05_weight_decay.py] -> Final Test Accuracy: 95.68%
+[06_increase_filters_and_mfcc.py] -> Final Test Accuracy: 97.68%
