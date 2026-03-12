@@ -7,7 +7,7 @@ from datetime import datetime
 
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.abspath(os.path.join(base_dir, ".."))
+    src_dir = os.path.abspath(os.path.join(base_dir, "..", ".."))
     project_root = os.path.abspath(os.path.join(src_dir, ".."))
     python_exe = os.path.join(project_root, ".venv", "Scripts", "python.exe")
     
@@ -24,7 +24,9 @@ def main():
         target_files = sys.argv[1:]
         scripts = [s for s in scripts if os.path.basename(s) in target_files]
 
-    results_file = os.path.join(base_dir, "Results.txt")
+    results_dir = os.path.join(base_dir, "Results")
+    os.makedirs(results_dir, exist_ok=True)
+    results_file = os.path.join(results_dir, "Results.txt")
 
     # Open in append mode instead of write mode to avoid overwriting
     with open(results_file, "a") as f:
@@ -34,7 +36,7 @@ def main():
 
     for script in scripts:
         script_name = os.path.basename(script)
-        rel_script_path = os.path.join("_Antigravity", script_name)
+        rel_script_path = os.path.join("_Antigravity", "Testing", script_name)
         
         print(f"Running '{script_name}' on GPU (will take some time)...")
         # Run process from the src directory
