@@ -17,7 +17,17 @@ import numpy as np
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
-CLASSES = ["yes", "no", "up", "down"]
+import json
+def load_keywords():
+    d = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(5):
+        p = os.path.join(d, "config.json")
+        if os.path.exists(p):
+            with open(p, "r") as f: return json.load(f)["keywords"]
+        d = os.path.dirname(d)
+    return ["yes", "no", "up", "down"]
+
+CLASSES = load_keywords()
 TARGET_SAMPLE_RATE = 16000
 NUM_SAMPLES = 16000
 BATCH_SIZE = 32
@@ -209,7 +219,7 @@ def train_model():
     plt.ylabel('True Labels')
     plt.title('Confusion Matrix')
     
-        cm_path = os.path.join(BASE_DIR, "Results", "confusion_matrix.png")
+    cm_path = os.path.join(BASE_DIR, "Results", "confusion_matrix.png")
     plt.savefig(cm_path)
     plt.close()
     print(f"Confusion matrix saved to {cm_path}")

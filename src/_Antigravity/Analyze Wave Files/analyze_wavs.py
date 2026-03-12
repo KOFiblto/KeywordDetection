@@ -3,10 +3,21 @@ import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
 
+import json
+def load_keywords():
+    d = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(5):
+        p = os.path.join(d, "config.json")
+        if os.path.exists(p):
+            with open(p, "r") as f: return json.load(f)["keywords"]
+        d = os.path.dirname(d)
+    return ["yes", "no", "up", "down"]
+
+
 def analyze_dataset():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "..", "dataset"))
-    classes = ["yes", "no", "up", "down"]
+    classes = load_keywords()
     
     durations = []
     sample_rates = set()

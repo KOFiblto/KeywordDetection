@@ -5,7 +5,17 @@ import getpass
 import zipfile
 
 # Configuration
-KEYWORDS = ["yes", "no", "up", "down"]
+import json
+def load_keywords():
+    d = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(5):
+        p = os.path.join(d, "config.json")
+        if os.path.exists(p):
+            with open(p, "r") as f: return json.load(f)["keywords"]
+        d = os.path.dirname(d)
+    return ["yes", "no", "up", "down"]
+
+KEYWORDS = load_keywords()
 DATASET = "neehakurelli/google-speech-commands"
 ZIP_FILE = "google-speech-commands.zip"
 TARGET_DIR = "../dataset"
