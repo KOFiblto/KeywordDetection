@@ -12,7 +12,8 @@ import time
 import numpy as np
 
 # 1. Configuration
-DATA_DIR = "../../dataset/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
 CLASSES = ["yes", "no", "up", "down"]
 TARGET_SAMPLE_RATE = 16000
 NUM_SAMPLES = 16000

@@ -11,7 +11,8 @@ import soundfile as sf
 import time
 
 # 1. Configuration
-DATA_DIR = "../dataset/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
 CLASSES = ["yes", "no", "up", "down"]
 TARGET_SAMPLE_RATE = 16000
 NUM_SAMPLES = 16000
@@ -174,7 +175,7 @@ def train_model():
         # Checkpointing
         if test_acc > best_acc:
             best_acc = test_acc
-            torch.save(model.state_dict(), "best_keyword_model.pth")
+            torch.save(model.state_dict(), os.path.join(BASE_DIR, "Results", "best_keyword_model.pth"))
             print(f"--> Saved new best model with accuracy: {best_acc:.2f}%")
 
         # Step the scheduler
@@ -184,7 +185,7 @@ def train_model():
     print(f"Training complete. Best Test Accuracy: {best_acc:.2f}%")
     
     # After the final epoch, restore the best checkpoint weights back into the model to return the best performing state seamlessly.
-    model.load_state_dict(torch.load("best_keyword_model.pth"))
+    model.load_state_dict(torch.load(os.path.join(BASE_DIR, "Results", "best_keyword_model.pth")))
 
 if __name__ == '__main__':
     train_model()

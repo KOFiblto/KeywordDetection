@@ -15,7 +15,8 @@ import seaborn as sns
 import numpy as np
 
 # 1. Configuration
-DATA_DIR = "../../dataset/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
 CLASSES = ["yes", "no", "up", "down"]
 TARGET_SAMPLE_RATE = 16000
 NUM_SAMPLES = 16000
@@ -176,14 +177,14 @@ def train_model():
 
         if test_acc > best_acc:
             best_acc = test_acc
-            torch.save(model.state_dict(), "best_keyword_model.pth")
+            torch.save(model.state_dict(), os.path.join(BASE_DIR, "Results", "best_keyword_model.pth"))
             print(f"--> Saved new best model with accuracy: {best_acc:.2f}%")
 
         scheduler.step(test_acc)
         print()
 
     print(f"Training complete. Best Test Accuracy: {best_acc:.2f}%")
-    model.load_state_dict(torch.load("best_keyword_model.pth"))
+    model.load_state_dict(torch.load(os.path.join(BASE_DIR, "Results", "best_keyword_model.pth")))
 
     # Confusion Matrix Evaluation
     print("Evaluating best model to generate confusion matrix...")
@@ -208,8 +209,7 @@ def train_model():
     plt.ylabel('True Labels')
     plt.title('Confusion Matrix')
     
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    cm_path = os.path.join(base_dir, "confusion_matrix.png")
+        cm_path = os.path.join(BASE_DIR, "Results", "confusion_matrix.png")
     plt.savefig(cm_path)
     plt.close()
     print(f"Confusion matrix saved to {cm_path}")
