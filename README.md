@@ -1,35 +1,25 @@
 # Keyword Detector
 
-A PyTorch-based neural network designed to detect specific spoken commands within audio files.
-
-## Supported Keywords
-
-The model classifies audio into one of the following categories:
+A neural network project designed to detect specific spoken commands within audio files. The model classifies audio into one of the following categories:
 * yes
 * no
 * up
 * down
 
-## Project Structure
+These will very likely be expanded in the future, but to shorten model-training time we only used 4 as of now.
 
-```text
-.
-├─ datasets/
-│   └─ speech_dataset/
-│       ├─ yes/
-│       │   └─ *.wav
-│       ├─ no/
-│       │   └─ *.wav
-│       ├─ up/
-│       │   └─ *.wav
-│       └─ down/
-│           └─ *.wav
-└─ src/
-    └─ *.ipynb
-```
+## Repository Branches
+
+The repository is structured into the following branches to manage releases, development, and different framework implementations:
+
+* **`main`**: Contains stable releases.
+* **`develop`**: The primary development branch, branching off from `main`.
+* **`Pytorch`**: The PyTorch implementation of the keyword detector, branching off from `develop`.
+* **`Dominik`**: The TensorFlow implementation, branching off from `develop` (Note: This branch is scheduled to be renamed to `Tensorflow`).
 
 ## Requirements
 
+*(Framework-specific requirements are managed within the respective implementation branches).*
 
 ## Installation
 
@@ -40,3 +30,5 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
+*(Usage details depend on the specific implementation branch).*
