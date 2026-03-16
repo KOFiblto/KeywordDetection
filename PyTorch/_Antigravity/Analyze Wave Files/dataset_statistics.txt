@@ -1,0 +1,20 @@
+Total Files Analyzed: 9486
+Unique Sample Rates: {16000} Hz
+
+--- Duration Stats ---
+Min Duration:  0.4644 seconds
+Max Duration:  1.0000 seconds
+Mean Duration: 0.9833 seconds
+
+--- Frame Counts (Samples) ---
+Top 10 most common clip lengths:
+  16000 samples (1.0000s): 8469 files (89.3%)
+  15702 samples (0.9814s): 112 files (1.2%)
+  15019 samples (0.9387s): 96 files (1.0%)
+  14336 samples (0.8960s): 83 files (0.9%)
+  13654 samples (0.8534s): 76 files (0.8%)
+  15604 samples (0.9752s): 68 files (0.7%)
+  12971 samples (0.8107s): 65 files (0.7%)
+  14861 samples (0.9288s): 65 files (0.7%)
+  13375 samples (0.8359s): 62 files (0.7%)
+  14118 samples (0.8824s): 56 files (0.6%)
