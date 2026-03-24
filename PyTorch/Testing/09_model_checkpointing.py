@@ -12,7 +12,7 @@ import time
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -85,29 +85,23 @@ class KeywordCNN(nn.Module):
     def __init__(self, num_classes):
         super(KeywordCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(16)
-        
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
-        
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(64)
 
         self.pool = nn.MaxPool2d(2, 2)
+        self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
         self.fc1 = nn.Linear(64 * 4 * 4, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
-        # NEW logic: Batch Normalization after Conv2d (before Activation)
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
-        x = F.relu(self.fc1(x))
+        x = self.dropout(F.relu(self.fc1(x)))
         logits = self.fc2(x)
         return logits
 
@@ -122,6 +116,9 @@ def train_model():
     mel_transform = torchaudio.transforms.MelSpectrogram(
         sample_rate=TARGET_SAMPLE_RATE, n_mels=64
     ).to(DEVICE)
+
+    # NEW logic: Model Checkpointing
+    best_acc = 0.0
 
     print(f"Training on {DEVICE}...")
 
@@ -169,9 +166,15 @@ def train_model():
         test_acc = 100. * test_correct / test_total
         dur = time.time() - start_time
 
-        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===\n")
+        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===")
 
-    print("Training complete.")
+        if test_acc > best_acc:
+            best_acc = test_acc
+            torch.save(model.state_dict(), os.path.join(BASE_DIR, "..", "Models", "best_model.pth"))
+            print(f"--> Saved new best model with accuracy: {best_acc:.2f}%")
+        print()
+
+    print(f"Training complete. Best Test Accuracy: {best_acc:.2f}%")
 
 if __name__ == '__main__':
     train_model()

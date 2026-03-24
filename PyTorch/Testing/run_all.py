@@ -7,7 +7,7 @@ from datetime import datetime
 
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    src_dir = os.path.abspath(os.path.join(base_dir, "..", ".."))
+    src_dir = os.path.abspath(os.path.join(base_dir, ".."))
     project_root = os.path.abspath(os.path.join(src_dir, ".."))
     python_exe = os.path.join(project_root, ".venv", "Scripts", "python.exe")
     
@@ -36,7 +36,7 @@ def main():
 
     for script in scripts:
         script_name = os.path.basename(script)
-        rel_script_path = os.path.join("_Antigravity", "Testing", script_name)
+        rel_script_path = os.path.join("Testing", script_name)
         
         print(f"Running '{script_name}' on GPU (will take some time)...")
         # Run process from the src directory
