@@ -25,8 +25,8 @@ def load_keywords():
     return ["yes", "no", "up", "down"]
 
 CLASSES = get_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001

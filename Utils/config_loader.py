@@ -15,7 +15,7 @@ def load_config():
         return json.load(f)
 
 def get_keywords():
-    return load_config().get("keywords", ["yes", "no", "up", "down"])
+    return load_config()["keywords"]
 
 def get_config_value(key, default=None):
     return load_config().get(key, default)
