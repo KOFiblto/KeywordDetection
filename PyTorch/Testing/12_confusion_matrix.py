@@ -27,7 +27,7 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
+CLASSES = get_keywords()
 TARGET_SAMPLE_RATE = 16000
 NUM_SAMPLES = 16000
 BATCH_SIZE = 32

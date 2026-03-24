@@ -17,7 +17,7 @@ def load_keywords():
 def analyze_dataset():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "dataset"))
-    classes = load_keywords()
+    classes = get_keywords()
     
     durations = []
     sample_rates = set()
