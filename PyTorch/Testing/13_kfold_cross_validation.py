@@ -13,7 +13,7 @@ import numpy as np
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -24,9 +24,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001

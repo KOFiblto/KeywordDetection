@@ -1,6 +1,0 @@
-soundfile
-torch
-torchaudio
-torchcodec
-scikit-learn
-jupyter

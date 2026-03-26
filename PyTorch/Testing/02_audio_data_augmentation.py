@@ -12,7 +12,7 @@ import time
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +23,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
@@ -54,9 +54,10 @@ train_paths, test_paths, train_labels, test_labels = train_test_split(
 )
 
 class KeywordDataset(Dataset):
-    def __init__(self, paths, labels):
+    def __init__(self, paths, labels, is_training=False):
         self.paths = paths
         self.labels = labels
+        self.is_training = is_training
 
     def __len__(self):
         return len(self.paths)
@@ -78,6 +79,13 @@ class KeywordDataset(Dataset):
             waveform = waveform[:, :NUM_SAMPLES]
         elif waveform.shape[1] < NUM_SAMPLES:
             waveform = F.pad(waveform, (0, NUM_SAMPLES - waveform.shape[1]))
+
+        # NEW logic: Audio Data Augmentation (Time-Shifts, Background Noise)
+        if self.is_training:
+            shift = random.randint(-1600, 1600)
+            waveform = torch.roll(waveform, shift, dims=-1)
+            noise = torch.randn_like(waveform) * 0.005
+            waveform = waveform + noise
 
         return waveform, torch.tensor(self.labels[idx], dtype=torch.long)
 
@@ -106,8 +114,8 @@ class KeywordCNN(nn.Module):
         return logits
 
 def train_model():
-    train_loader = DataLoader(KeywordDataset(train_paths, train_labels), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
-    test_loader = DataLoader(KeywordDataset(test_paths, test_labels), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
+    train_loader = DataLoader(KeywordDataset(train_paths, train_labels, is_training=True), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
+    test_loader = DataLoader(KeywordDataset(test_paths, test_labels, is_training=False), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
 
     model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
@@ -116,9 +124,6 @@ def train_model():
     mel_transform = torchaudio.transforms.MelSpectrogram(
         sample_rate=TARGET_SAMPLE_RATE, n_mels=64
     ).to(DEVICE)
-
-    # NEW logic: Model Checkpointing
-    best_acc = 0.0
 
     print(f"Training on {DEVICE}...")
 
@@ -166,15 +171,9 @@ def train_model():
         test_acc = 100. * test_correct / test_total
         dur = time.time() - start_time
 
-        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===")
+        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===\n")
 
-        if test_acc > best_acc:
-            best_acc = test_acc
-            torch.save(model.state_dict(), os.path.join(BASE_DIR, "Results", "best_model.pth"))
-            print(f"--> Saved new best model with accuracy: {best_acc:.2f}%")
-        print()
-
-    print(f"Training complete. Best Test Accuracy: {best_acc:.2f}%")
+    print("Training complete.")
 
 if __name__ == '__main__':
     train_model()

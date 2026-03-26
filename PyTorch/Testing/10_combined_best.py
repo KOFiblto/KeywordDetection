@@ -12,7 +12,7 @@ import time
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +23,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
@@ -54,9 +54,10 @@ train_paths, test_paths, train_labels, test_labels = train_test_split(
 )
 
 class KeywordDataset(Dataset):
-    def __init__(self, paths, labels):
+    def __init__(self, paths, labels, is_training=False):
         self.paths = paths
         self.labels = labels
+        self.is_training = is_training
 
     def __len__(self):
         return len(self.paths)
@@ -74,6 +75,10 @@ class KeywordDataset(Dataset):
         if waveform.shape[0] > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
 
+        if self.is_training:
+            shift = random.randint(-1600, 1600)
+            waveform = torch.roll(waveform, shift, dims=-1)
+
         if waveform.shape[1] > NUM_SAMPLES:
             waveform = waveform[:, :NUM_SAMPLES]
         elif waveform.shape[1] < NUM_SAMPLES:
@@ -85,43 +90,42 @@ class KeywordCNN(nn.Module):
     def __init__(self, num_classes):
         super(KeywordCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(16)
-        
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(32)
-        
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.bn3 = nn.BatchNorm2d(64)
+        self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
 
         self.pool = nn.MaxPool2d(2, 2)
+        self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
-        self.fc1 = nn.Linear(64 * 4 * 4, 128)
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
-        # NEW logic: Batch Normalization after Conv2d (before Activation)
-        x = self.pool(F.relu(self.bn1(self.conv1(x))))
-        x = self.pool(F.relu(self.bn2(self.conv2(x))))
-        x = self.pool(F.relu(self.bn3(self.conv3(x))))
-        
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(F.relu(self.conv4(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
-        x = F.relu(self.fc1(x))
+        x = self.dropout(F.relu(self.fc1(x)))
         logits = self.fc2(x)
         return logits
 
 def train_model():
-    train_loader = DataLoader(KeywordDataset(train_paths, train_labels), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
-    test_loader = DataLoader(KeywordDataset(test_paths, test_labels), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
+    train_loader = DataLoader(KeywordDataset(train_paths, train_labels, is_training=True), batch_size=BATCH_SIZE, shuffle=True, num_workers=0, pin_memory=True)
+    test_loader = DataLoader(KeywordDataset(test_paths, test_labels, is_training=False), batch_size=BATCH_SIZE, shuffle=False, num_workers=0, pin_memory=True)
 
     model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    mel_transform = torchaudio.transforms.MelSpectrogram(
-        sample_rate=TARGET_SAMPLE_RATE, n_mels=64
+    mfcc_transform = torchaudio.transforms.MFCC(
+        sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
     ).to(DEVICE)
+    
+    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=10).to(DEVICE)
+    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=20).to(DEVICE)
 
     print(f"Training on {DEVICE}...")
 
@@ -136,7 +140,9 @@ def train_model():
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
 
             with torch.no_grad():
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
+                inputs = freq_masking(inputs)
+                inputs = time_masking(inputs)
 
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -160,7 +166,7 @@ def train_model():
         with torch.no_grad():
             for inputs, targets in test_loader:
                 inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
                 outputs = model(inputs)
                 _, predicted = outputs.max(1)
                 test_total += targets.size(0)

@@ -7,12 +7,16 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
 import soundfile as sf
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +27,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
@@ -75,17 +79,14 @@ class KeywordDataset(Dataset):
         if waveform.shape[0] > 1:
             waveform = torch.mean(waveform, dim=0, keepdim=True)
 
+        if self.is_training:
+            shift = random.randint(-1600, 1600)
+            waveform = torch.roll(waveform, shift, dims=-1)
+
         if waveform.shape[1] > NUM_SAMPLES:
             waveform = waveform[:, :NUM_SAMPLES]
         elif waveform.shape[1] < NUM_SAMPLES:
             waveform = F.pad(waveform, (0, NUM_SAMPLES - waveform.shape[1]))
-
-        # NEW logic: Audio Data Augmentation (Time-Shifts, Background Noise)
-        if self.is_training:
-            shift = random.randint(-1600, 1600)
-            waveform = torch.roll(waveform, shift, dims=-1)
-            noise = torch.randn_like(waveform) * 0.005
-            waveform = waveform + noise
 
         return waveform, torch.tensor(self.labels[idx], dtype=torch.long)
 
@@ -95,18 +96,20 @@ class KeywordCNN(nn.Module):
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
 
         self.pool = nn.MaxPool2d(2, 2)
         self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
-        self.fc1 = nn.Linear(64 * 4 * 4, 128)
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = self.pool(F.relu(self.conv3(x)))
+        x = self.pool(F.relu(self.conv4(x)))
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
         x = self.dropout(F.relu(self.fc1(x)))
@@ -120,10 +123,17 @@ def train_model():
     model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3)
 
-    mel_transform = torchaudio.transforms.MelSpectrogram(
-        sample_rate=TARGET_SAMPLE_RATE, n_mels=64
+    mfcc_transform = torchaudio.transforms.MFCC(
+        sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
     ).to(DEVICE)
+    
+    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=10).to(DEVICE)
+    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=20).to(DEVICE)
+
+    best_acc = 0.0
 
     print(f"Training on {DEVICE}...")
 
@@ -138,7 +148,9 @@ def train_model():
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
 
             with torch.no_grad():
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
+                inputs = freq_masking(inputs)
+                inputs = time_masking(inputs)
 
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -162,7 +174,7 @@ def train_model():
         with torch.no_grad():
             for inputs, targets in test_loader:
                 inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
-                inputs = mel_transform(inputs)
+                inputs = mfcc_transform(inputs)
                 outputs = model(inputs)
                 _, predicted = outputs.max(1)
                 test_total += targets.size(0)
@@ -171,9 +183,46 @@ def train_model():
         test_acc = 100. * test_correct / test_total
         dur = time.time() - start_time
 
-        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===\n")
+        print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===")
 
-    print("Training complete.")
+        if test_acc > best_acc:
+            best_acc = test_acc
+            torch.save(model.state_dict(), os.path.join(BASE_DIR, "..", "Models", "best_keyword_model.pth"))
+            print(f"--> Saved new best model with accuracy: {best_acc:.2f}%")
+
+        scheduler.step(test_acc)
+        print()
+
+    print(f"Training complete. Best Test Accuracy: {best_acc:.2f}%")
+    model.load_state_dict(torch.load(os.path.join(BASE_DIR, "..", "Models", "best_keyword_model.pth")))
+
+    # Confusion Matrix Evaluation
+    print("Evaluating best model to generate confusion matrix...")
+    model.eval()
+    all_targets = []
+    all_predictions = []
+
+    with torch.no_grad():
+        for inputs, targets in test_loader:
+            inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
+            inputs = mfcc_transform(inputs)
+            outputs = model(inputs)
+            _, predicted = outputs.max(1)
+            all_targets.extend(targets.cpu().numpy())
+            all_predictions.extend(predicted.cpu().numpy())
+
+    cm = confusion_matrix(all_targets, all_predictions)
+    
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=CLASSES, yticklabels=CLASSES)
+    plt.xlabel('Predicted Labels')
+    plt.ylabel('True Labels')
+    plt.title('Confusion Matrix')
+    
+    cm_path = os.path.join(BASE_DIR, "Results", "confusion_matrix.png")
+    plt.savefig(cm_path)
+    plt.close()
+    print(f"Confusion matrix saved to {cm_path}")
 
 if __name__ == '__main__':
     train_model()

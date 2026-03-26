@@ -12,7 +12,7 @@ import time
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +23,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
@@ -112,10 +112,11 @@ def train_model():
     model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # NEW logic: LR Scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3)
 
-    # NEW logic: 128 Mel bins
     mel_transform = torchaudio.transforms.MelSpectrogram(
-        sample_rate=TARGET_SAMPLE_RATE, n_mels=128
+        sample_rate=TARGET_SAMPLE_RATE, n_mels=64
     ).to(DEVICE)
 
     print(f"Training on {DEVICE}...")
@@ -165,6 +166,9 @@ def train_model():
         dur = time.time() - start_time
 
         print(f"=== Epoch {epoch+1}/{EPOCHS} [{dur:.2f}s] Summary | Train Loss: {total_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}% ===\n")
+        
+        # Step the scheduler
+        scheduler.step(test_acc)
 
     print("Training complete.")
 

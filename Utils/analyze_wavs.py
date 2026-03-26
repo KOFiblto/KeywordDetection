@@ -16,8 +16,8 @@ def load_keywords():
 
 def analyze_dataset():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "..", "dataset"))
-    classes = load_keywords()
+    dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "dataset"))
+    classes = get_keywords()
     
     durations = []
     sample_rates = set()
@@ -69,7 +69,8 @@ def analyze_dataset():
         idx = sorted_indices[i]
         frames = unique_frames[idx]
         count = counts[idx]
-        duration_sec = frames / 16000.0  # assuming 16kHz
+        target_sr = get_config_value('target_sample_rate', 16000)
+        duration_sec = frames / target_sr
         percentage = (count / len(durations)) * 100
         lines.append(f"  {frames} samples ({duration_sec:.4f}s): {count} files ({percentage:.1f}%)")
 

@@ -12,7 +12,7 @@ import time
 
 # 1. Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..", "dataset"))
+DATA_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "dataset"))
 import json
 def load_keywords():
     d = os.path.dirname(os.path.abspath(__file__))
@@ -23,9 +23,9 @@ def load_keywords():
         d = os.path.dirname(d)
     return ["yes", "no", "up", "down"]
 
-CLASSES = load_keywords()
-TARGET_SAMPLE_RATE = 16000
-NUM_SAMPLES = 16000
+CLASSES = get_keywords()
+TARGET_SAMPLE_RATE = get_config_value('target_sample_rate', 16000)
+NUM_SAMPLES = get_config_value('num_samples', 16000)
 BATCH_SIZE = 32
 EPOCHS = 40
 LEARNING_RATE = 0.001
@@ -85,23 +85,29 @@ class KeywordCNN(nn.Module):
     def __init__(self, num_classes):
         super(KeywordCNN, self).__init__()
         self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(16)
+        
         self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(32)
+        
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(64)
 
         self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(0.3)
         self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
 
         self.fc1 = nn.Linear(64 * 4 * 4, 128)
         self.fc2 = nn.Linear(128, num_classes)
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
+        # NEW logic: Batch Normalization after Conv2d (before Activation)
+        x = self.pool(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool(F.relu(self.bn3(self.conv3(x))))
+        
         x = self.adaptive_pool(x)
         x = torch.flatten(x, 1)
-        x = self.dropout(F.relu(self.fc1(x)))
+        x = F.relu(self.fc1(x))
         logits = self.fc2(x)
         return logits
 
@@ -116,10 +122,6 @@ def train_model():
     mel_transform = torchaudio.transforms.MelSpectrogram(
         sample_rate=TARGET_SAMPLE_RATE, n_mels=64
     ).to(DEVICE)
-    
-    # NEW logic: SpecAugment
-    freq_masking = torchaudio.transforms.FrequencyMasking(freq_mask_param=15).to(DEVICE)
-    time_masking = torchaudio.transforms.TimeMasking(time_mask_param=35).to(DEVICE)
 
     print(f"Training on {DEVICE}...")
 
@@ -135,9 +137,6 @@ def train_model():
 
             with torch.no_grad():
                 inputs = mel_transform(inputs)
-                # Apply SpecAugment in training
-                inputs = freq_masking(inputs)
-                inputs = time_masking(inputs)
 
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -162,7 +161,6 @@ def train_model():
             for inputs, targets in test_loader:
                 inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
                 inputs = mel_transform(inputs)
-                # Do NOT apply SpecAugment during validation
                 outputs = model(inputs)
                 _, predicted = outputs.max(1)
                 test_total += targets.size(0)
