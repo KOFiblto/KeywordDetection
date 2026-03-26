@@ -20,3 +20,5 @@ env/
 
 # Audiofiles
 *.wav
+
+.vscode/
