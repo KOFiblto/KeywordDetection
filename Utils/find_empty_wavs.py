@@ -103,8 +103,8 @@ def check_empty_wavs(dataset_dir, rms_threshold=50.0, peak_threshold=500):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Find empty or silent .wav files in a dataset.")
     parser.add_argument("--dir", type=str, help="Dataset directory (defaults to ../dataset or ./dataset)")
-    parser.add_argument("--rms", type=float, default=10.0, help="RMS threshold for silence (default: 10.0)")
-    parser.add_argument("--peak", type=int, default=200, help="Peak threshold for silence (default: 200)")
+    parser.add_argument("--rms", type=float, default=50.0, help="RMS threshold for silence (default: 10.0)")
+    parser.add_argument("--peak", type=int, default=500, help="Peak threshold for silence (default: 200)")
     parser.add_argument("--move", action="store_true", help="Perform Automove operations")
     
     args = parser.parse_args()
