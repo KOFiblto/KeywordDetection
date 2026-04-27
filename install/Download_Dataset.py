@@ -3,6 +3,11 @@ import sys
 import subprocess
 import getpass
 import zipfile
+import wave
+import struct
+import math
+import shutil
+from pathlib import Path
 
 # Configuration
 import json
@@ -13,7 +18,7 @@ def load_keywords():
         if os.path.exists(p):
             with open(p, "r") as f: return json.load(f)["keywords"]
         d = os.path.dirname(d)
-    return ["yes", "no", "up", "down"]
+    return ["yes", "no", "up", "down", "other"]
 
 KEYWORDS = load_keywords()
 DATASET = "neehakurelli/google-speech-commands"
@@ -93,6 +98,43 @@ def main():
     if os.path.exists(ZIP_FILE):
         os.remove(ZIP_FILE)
         
+    print("Scanning for silent/empty background noise files to move to 'other'...")
+    other_dir = os.path.join(TARGET_DIR, "other")
+    os.makedirs(other_dir, exist_ok=True)
+    
+    dataset_path = Path(TARGET_DIR)
+    moved_count = 0
+    for wav_file in dataset_path.rglob("*.wav"):
+        if wav_file.parent.name == "other":
+            continue
+            
+        is_empty = False
+        try:
+            if wav_file.stat().st_size == 0:
+                is_empty = True
+            else:
+                with wave.open(str(wav_file), 'rb') as w:
+                    frames = w.readframes(w.getnframes())
+                    sampwidth = w.getsampwidth()
+                    num_samples = len(frames) // sampwidth
+                    if num_samples == 0:
+                        is_empty = True
+                    else:
+                        fmt = f"<{num_samples}h" if sampwidth == 2 else f"<{num_samples}b"
+                        samples = struct.unpack(fmt, frames[:num_samples*sampwidth])
+                        rms = math.sqrt(sum(s**2 for s in samples) / num_samples)
+                        if rms < 50.0:
+                            is_empty = True
+        except Exception:
+            is_empty = True
+            
+        if is_empty:
+            # Prefix with original folder name to prevent overwriting files with the same name
+            new_name = f"{wav_file.parent.name}_{wav_file.name}"
+            shutil.move(str(wav_file), os.path.join(other_dir, new_name))
+            moved_count += 1
+            
+    print(f"Moved {moved_count} silent/empty files to the 'other' dataset.")
     print(f"Success. The dataset is ready in the '{TARGET_DIR}' directory.")
 
 if __name__ == "__main__":
