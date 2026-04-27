@@ -8,7 +8,6 @@ def load_config():
     config_path = os.path.join(root_dir, "config.json")
     
     if not os.path.exists(config_path):
-        # Fallback to current directory for edge cases
         config_path = "config.json"
         
     with open(config_path, "r") as f:
