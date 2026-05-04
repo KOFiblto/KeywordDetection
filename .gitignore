@@ -22,3 +22,7 @@ env/
 
 # Audiofiles
 *.wav
+
+# Other
+*.json
+*.zip
