@@ -7,21 +7,24 @@ import soundfile as sf
 import sounddevice as sd
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QSlider, QSizePolicy
+    QPushButton, QLabel, QSlider, QSizePolicy, QInputDialog
 )
 from PyQt6.QtCore import Qt, QTimer
 import pyqtgraph as pg
 
 # Configuration
-DATASET_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dataset')
-STATE_FILE = os.path.join(os.path.dirname(__file__), 'state.json')
-LOG_FILE = os.path.join(os.path.dirname(__file__), 'cleanup_dataset.json')
+DATASET_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), '../dataset')
 
 class AudioReviewer(QMainWindow):
-    def __init__(self):
+    def __init__(self, selected_category, categories):
         super().__init__()
-        self.setWindowTitle("Audio Dataset Cleanup")
+        self.setWindowTitle(f"Audio Dataset Cleanup - {selected_category}")
         self.resize(800, 600)
+        
+        self.selected_category = selected_category
+        self.categories = categories
+        self.data_file = os.path.join(os.path.dirname(__file__), f"{selected_category}_data.json")
+        self.state_data = {"current_index": 0, "logs": []}
         
         self.files = []
         self.current_index = 0
@@ -29,10 +32,7 @@ class AudioReviewer(QMainWindow):
         self.current_sr = None
         self.is_playing = False
         
-        self.undo_stack = []  # Store up to 10 previous decisions: list of (index, log_entry)
-        
-        self.categories = ['yes', 'no', 'up', 'down', 'other']  # Default
-        self.load_categories_from_config()
+        self.undo_stack = []  
         
         self.init_ui()
         self.load_files_and_sort()
@@ -41,21 +41,13 @@ class AudioReviewer(QMainWindow):
         if self.files:
             self.load_file(self.current_index)
         else:
-            self.info_label.setText("No .wav files found in dataset/")
-
-    def load_categories_from_config(self):
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                data = json.load(f)
-                if 'keywords' in data:
-                    self.categories = data['keywords']
+            self.info_label.setText(f"No .wav files found in dataset/{self.selected_category}/")
 
     def load_files_and_sort(self):
-        self.info_label.setText("Scanning and calculating RMS for all files... Please wait.")
+        self.info_label.setText(f"Scanning and calculating RMS for '{self.selected_category}'... Please wait.")
         QApplication.processEvents()
         
-        search_pattern = os.path.join(DATASET_DIR, '**', '*.wav')
+        search_pattern = os.path.join(DATASET_DIR, self.selected_category, '**', '*.wav')
         wav_files = glob.glob(search_pattern, recursive=True)
         
         file_rms = []
@@ -66,39 +58,38 @@ class AudioReviewer(QMainWindow):
                     rms = 0
                 else:
                     rms = np.sqrt(np.mean(data**2))
-                # Store relative path
                 rel_path = os.path.relpath(f, DATASET_DIR)
                 rel_path = rel_path.replace('\\', '/')
                 file_rms.append((rel_path, rms))
             except Exception as e:
                 print(f"Failed to read {f}: {e}")
                 
-        # Sort by RMS ascending
         file_rms.sort(key=lambda x: x[1])
         self.files = [x[0] for x in file_rms]
         
     def load_state(self):
-        if os.path.exists(STATE_FILE):
-            with open(STATE_FILE, 'r') as f:
-                data = json.load(f)
-                self.current_index = data.get('current_index', 0)
+        if os.path.exists(self.data_file):
+            with open(self.data_file, 'r') as f:
+                self.state_data = json.load(f)
+                self.current_index = self.state_data.get('current_index', 0)
+                if "logs" not in self.state_data:
+                    self.state_data["logs"] = []
                 
-        # Make sure index is valid
         if self.current_index >= len(self.files):
             self.current_index = len(self.files) - 1
         if self.current_index < 0:
             self.current_index = 0
 
     def save_state(self):
-        with open(STATE_FILE, 'w') as f:
-            json.dump({'current_index': self.current_index}, f)
+        self.state_data['current_index'] = self.current_index
+        with open(self.data_file, 'w') as f:
+            json.dump(self.state_data, f, indent=2)
 
     def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         
-        # Info label
         self.info_label = QLabel("Loading...")
         self.info_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -109,14 +100,12 @@ class AudioReviewer(QMainWindow):
         self.details_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.details_label)
         
-        # Plot
         self.plot_widget = pg.PlotWidget()
         self.plot_widget.setMouseEnabled(x=False, y=False)
         self.plot_widget.hideAxis('left')
         self.plot_widget.hideAxis('bottom')
         main_layout.addWidget(self.plot_widget)
         
-        # Audio controls
         audio_layout = QHBoxLayout()
         self.play_pause_btn = QPushButton("Pause")
         self.play_pause_btn.clicked.connect(self.toggle_playback)
@@ -125,7 +114,7 @@ class AudioReviewer(QMainWindow):
         audio_layout.addWidget(QLabel("Volume Boost:"))
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setMinimum(1)
-        self.volume_slider.setMaximum(100) # representing 1.0 to 10.0
+        self.volume_slider.setMaximum(100)
         self.volume_slider.setValue(10)
         self.volume_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.volume_slider.setTickInterval(10)
@@ -137,7 +126,6 @@ class AudioReviewer(QMainWindow):
         
         main_layout.addLayout(audio_layout)
         
-        # Action controls
         action_layout = QHBoxLayout()
         self.correct_btn = QPushButton("CORRECT (Space)")
         self.correct_btn.setStyleSheet("background-color: #4CAF50; color: white; font-size: 20px; font-weight: bold; padding: 20px;")
@@ -152,7 +140,6 @@ class AudioReviewer(QMainWindow):
         
         main_layout.addLayout(action_layout)
         
-        # Categories
         cat_layout = QHBoxLayout()
         for cat in self.categories:
             btn = QPushButton(cat)
@@ -161,7 +148,6 @@ class AudioReviewer(QMainWindow):
             cat_layout.addWidget(btn)
         main_layout.addLayout(cat_layout)
         
-        # Set focus to capture keys
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     def load_file(self, index):
@@ -180,7 +166,6 @@ class AudioReviewer(QMainWindow):
             self.current_audio = np.zeros(100)
             self.current_sr = 16000
             
-        # UI updates
         expected_cat = os.path.dirname(rel_path)
         filename = os.path.basename(rel_path)
         duration = len(self.current_audio) / self.current_sr if self.current_sr else 0
@@ -188,13 +173,11 @@ class AudioReviewer(QMainWindow):
         self.info_label.setText(f"File {index+1}/{len(self.files)}: {filename}")
         self.details_label.setText(f"Category: {expected_cat} | Duration: {duration:.2f}s")
         
-        # Plot
         self.plot_widget.clear()
         self.plot_widget.plot(self.current_audio, pen='y')
         
-        # Reset slider and volume
         self.volume_slider.blockSignals(True)
-        self.volume_slider.setValue(10) # 1.0x
+        self.volume_slider.setValue(10)
         self.volume_slider.blockSignals(False)
         self.volume_label.setText("1.0x")
         
@@ -206,8 +189,6 @@ class AudioReviewer(QMainWindow):
         
         vol_multiplier = self.volume_slider.value() / 10.0
         audio_to_play = self.current_audio * vol_multiplier
-        
-        # clip to prevent horrible distortion sounds taking down the system
         audio_to_play = np.clip(audio_to_play, -1.0, 1.0)
         
         sd.stop()
@@ -249,25 +230,13 @@ class AudioReviewer(QMainWindow):
         rel_path = self.files[self.current_index]
         log_entry = {"filepath": rel_path, "action": action}
         
-        # Append to log
-        logs = []
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, 'r') as f:
-                    logs = json.load(f)
-            except:
-                pass
-                
-        logs.append(log_entry)
+        self.state_data["logs"].append(log_entry)
         
-        with open(LOG_FILE, 'w') as f:
-            json.dump(logs, f, indent=2)
-            
-        # Add to undo stack
         self.undo_stack.append((self.current_index, log_entry))
         if len(self.undo_stack) > 10:
             self.undo_stack.pop(0)
             
+        self.save_state()
         self.next_file()
 
     def next_file(self):
@@ -277,11 +246,10 @@ class AudioReviewer(QMainWindow):
             self.load_file(self.current_index)
         else:
             self.stop_audio()
-            self.info_label.setText("Finished all files!")
+            self.info_label.setText("Finished all files in this category!")
             
     def undo(self):
         if not self.undo_stack:
-            # If no undo stack but we just want to go back
             if self.current_index > 0:
                 self.current_index -= 1
                 self.save_state()
@@ -290,19 +258,8 @@ class AudioReviewer(QMainWindow):
             
         prev_index, log_entry = self.undo_stack.pop()
         
-        # Remove from log file
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, 'r') as f:
-                    logs = json.load(f)
-                
-                # Try to remove the exact entry from the end
-                if logs and logs[-1] == log_entry:
-                    logs.pop()
-                    with open(LOG_FILE, 'w') as f:
-                        json.dump(logs, f, indent=2)
-            except:
-                pass
+        if self.state_data["logs"] and self.state_data["logs"][-1] == log_entry:
+            self.state_data["logs"].pop()
                 
         self.current_index = prev_index
         self.save_state()
@@ -315,6 +272,20 @@ class AudioReviewer(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = AudioReviewer()
+    
+    categories = ['yes', 'no', 'up', 'down', 'other']
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.json')
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            data = json.load(f)
+            if 'keywords' in data:
+                categories = data['keywords']
+
+    category, ok = QInputDialog.getItem(None, "Select Category", "Choose a category to review:", categories, 0, False)
+    
+    if not ok or not category:
+        sys.exit()
+        
+    window = AudioReviewer(category, categories)
     window.show()
     sys.exit(app.exec())
