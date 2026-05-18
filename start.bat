@@ -5,7 +5,7 @@ echo Starting Keyword Detection Application...
 start "KeywordDetectionBackend" cmd /c "cd /d "%~dp0backend" && "..\.venv\Scripts\python.exe" main.py"
 
 :: Wait a moment to ensure backend starts
-timeout /t 2 /nobreak > nul
+ping 127.0.0.1 -n 3 > nul
 
 :: Start the Electron frontend in a new command window
 start "KeywordDetectionFrontend" cmd /c "cd /d "%~dp0frontend" && npm start"

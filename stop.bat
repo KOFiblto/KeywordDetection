@@ -11,4 +11,4 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr :18000') do (
 )
 
 echo App stopped successfully!
-timeout /t 2 /nobreak > nul
+ping 127.0.0.1 -n 3 > nul
