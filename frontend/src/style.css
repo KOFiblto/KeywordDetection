@@ -1,0 +1,236 @@
+:root {
+  --bg-base: #111111;
+  --bg-panel: #1a1a1a;
+  --bg-hover: #222222;
+  --border-color: #333333;
+  --primary-color: #0070f3;
+  --primary-hover: #0051b3;
+  --danger-color: #e00;
+  --danger-hover: #c00;
+  --text-main: #ededed;
+  --text-muted: #a1a1a1;
+  --accent-color: #00df89;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-base);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+select {
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  cursor: pointer;
+}
+
+select:focus {
+  border-color: var(--primary-color);
+}
+
+button {
+  background: var(--bg-panel);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button:hover {
+  background: var(--bg-hover);
+  border-color: #666;
+}
+
+button#custom-model-btn {
+  background: transparent;
+}
+
+button.primary {
+  background: var(--text-main);
+  color: var(--bg-base);
+  border-color: var(--text-main);
+}
+
+button.primary:hover {
+  background: #fff;
+}
+
+button.danger {
+  background: var(--danger-color);
+  color: white;
+  border-color: var(--danger-color);
+}
+
+button.danger:hover {
+  background: var(--danger-hover);
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  color: var(--text-main);
+}
+
+.tab.active {
+  color: var(--text-main);
+  border-bottom-color: var(--text-main);
+}
+
+.mode-content {
+  display: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2rem;
+  min-height: 400px;
+}
+
+.mode-content.active {
+  display: block;
+}
+
+.normal-mode-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  height: 100%;
+}
+
+.record-btn {
+  width: auto;
+  min-width: 140px;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  border-radius: 6px;
+  background: var(--text-main);
+  color: var(--bg-base);
+}
+
+.record-btn:hover {
+  background: #ffffff;
+}
+
+.record-btn.recording {
+  background: var(--danger-color);
+  color: white;
+  border-color: var(--danger-color);
+}
+
+.result-display {
+  font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
+  min-height: 2.5rem;
+  color: var(--accent-color);
+  letter-spacing: -0.02em;
+}
+
+.visualizers {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.visualizer-box {
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.visualizer-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  z-index: 10;
+  background: rgba(17, 17, 17, 0.8);
+  padding: 2px 6px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+#waveform, #spectrogram {
+  width: 100%;
+  height: 128px;
+}
+
+.highlight-region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 223, 137, 0.15);
+  border-left: 1px solid var(--accent-color);
+  border-right: 1px solid var(--accent-color);
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 5px;
+  color: var(--accent-color);
+  font-size: 0.75rem;
+}

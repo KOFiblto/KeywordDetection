@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Keyword Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./src/style.css">
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Keyword Detection AI</h1>
+        <div class="model-selector">
+          <label for="model-select">Model:</label>
+          <select id="model-select">
+            <option value="loading">Loading models...</option>
+          </select>
+          <button id="custom-model-btn">Browse Custom</button>
+        </div>
+      </header>
+
+      <div class="tabs">
+        <div class="tab active" data-target="normal-mode">Normal Mode</div>
+        <div class="tab" data-target="live-mode">Live Mode</div>
+      </div>
+
+      <main>
+        <!-- NORMAL MODE -->
+        <div id="normal-mode" class="mode-content active">
+          <div class="normal-mode-controls">
+            <button id="record-btn-normal" class="record-btn">Hold to Talk</button>
+            <div id="result-normal" class="result-display">Waiting for audio...</div>
+          </div>
+        </div>
+
+        <!-- LIVE MODE -->
+        <div id="live-mode" class="mode-content">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button id="record-btn-live" class="record-btn" style="width: auto; height: auto; padding: 1rem 2rem; border-radius: 8px;">Start Live Stream</button>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+              <label for="interval-slider" style="color: var(--text-muted); font-size: 0.875rem;">Inference Interval: <span id="interval-display">200ms</span></label>
+              <input type="range" id="interval-slider" min="10" max="1000" value="200" step="10">
+            </div>
+            <div id="result-live" class="result-display" style="font-size: 1.5rem;">Ready</div>
+          </div>
+
+          <div style="display: flex; gap: 1.5rem; margin-top: 2rem;">
+            <!-- Global Legend -->
+            <div style="width: 120px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 4px; padding: 1rem; flex-shrink: 0; display: flex; flex-direction: column;">
+              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold; margin-bottom: 12px; text-transform: uppercase;">Legend</span>
+              <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.75rem; font-weight: 500;">
+                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #3b82f6; font-size: 1.2rem;">■</span> YES</span>
+                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #ef4444; font-size: 1.2rem;">■</span> NO</span>
+                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #10b981; font-size: 1.2rem;">■</span> UP</span>
+                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #f59e0b; font-size: 1.2rem;">■</span> DOWN</span>
+                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #a1a1a1; font-size: 1.2rem;">■</span> OTHER</span>
+              </div>
+            </div>
+
+            <div class="visualizers" style="flex-grow: 1; margin-top: 0;">
+              <div class="visualizer-box" style="height: 40px; padding: 0; display: flex;">
+                <div class="visualizer-label" style="top: 2px; left: 2px;">Detections</div>
+                <div id="detections" style="flex-grow: 1; height: 100%;"></div>
+              </div>
+
+              <div class="visualizer-box">
+                <div class="visualizer-label">Waveform (15s)</div>
+                <div id="waveform"></div>
+              </div>
+              
+              <div class="visualizer-box">
+                <div class="visualizer-label">Spectrogram (15s)</div>
+                <div id="spectrogram"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
