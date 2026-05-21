@@ -1,0 +1,773 @@
+{
+  "current_index": 192,
+  "logs": [
+    {
+      "filepath": "up/e96a5020_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/e53139ad_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f953e1af_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/8830e17f_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/e96a5020_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ad63d93c_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ced835d3_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/51055bda_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ced835d3_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ced835d3_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ced835d3_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ced835d3_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/fd395b74_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/fd395b74_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/fd395b74_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/fd395b74_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9799379a_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3f2b358d_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/36050ef3_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/6c968bd9_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9799379a_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/7f74626f_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b9f46737_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b9f46737_nohash_5.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/5fadb538_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/7f74626f_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/72198b96_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/1eddce1d_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/1eddce1d_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/28ce0c58_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9799379a_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9a43b64b_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/c2e08f08_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/91223b83_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/92a9c5e6_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f8f60f59_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3f2b358d_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/65079685_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/190821dc_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dedc7fab_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/e649aa92_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/bdee441c_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/fd395b74_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ba59cab3_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/bd061bef_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f0edc767_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dbb40d24_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/712e4d58_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/46a153d8_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/4c4d2526_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3ff840aa_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b959cd0c_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/15c563d7_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/7061c7d1_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/bd061bef_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dbb40d24_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ccf418a5_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/65079685_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b16f2d0d_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/8f4c551f_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/2e73212b_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/c2e08f08_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/c2e08f08_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/5e1b34a6_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3f2b358d_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/190821dc_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b16f2d0d_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/8f4c551f_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dbb40d24_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3ff840aa_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/dbb40d24_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/cc6bae0d_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b959cd0c_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/46a153d8_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/2e73212b_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/b959cd0c_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/32a19ecf_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b959cd0c_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/e41e41f7_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3ff840aa_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/d430b3cc_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/5e1b34a6_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dbb40d24_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9080f6d3_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/33f60c62_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d9462202_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/98582fee_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/2e30f9a5_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ee483d85_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ba770f9b_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/86b89661_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/8b39e36f_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d9462202_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/14587ff0_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/c4f875a9_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/2da58b32_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/7f17667c_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b959cd0c_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/20d3f11f_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f63a6479_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/c37a72d3_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/36050ef3_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/ee483d85_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f3210686_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b7669804_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/db4cf12f_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/e82914c0_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/512dc91a_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/8b39e36f_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/46a153d8_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/adb45ef2_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/de6eb27c_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/d84829e0_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/f17be97f_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/3c6d55b3_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/2e30f9a5_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/5e1b34a6_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/7d8babdb_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/90b94017_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d750966e_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/2d92f18b_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/1bc45db9_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/61a0d340_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/46a153d8_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/2e30f9a5_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/e07dd7d4_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/9d050657_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/f59d0771_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/46a153d8_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/2d3c8dcb_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/cab100c9_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/df1d5024_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/712e4d58_nohash_2.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d98f6043_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/569455ff_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/65079685_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/6d2d3b0d_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/df1d5024_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/122c5aa7_nohash_4.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/126403d4_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/3e3b65eb_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/712e4d58_nohash_3.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/747e69fd_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/cb2929ce_nohash_3.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/e14a99a5_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/c86d4fd4_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/fd32732a_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/20d3f11f_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/b65f6015_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/21e8c417_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/7e1054e7_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/8f4c551f_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/234ab0fb_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/7d8babdb_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/e14a99a5_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/32a19ecf_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/80fe1dc7_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/96105282_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/c3538de1_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/712e4d58_nohash_4.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/43691f67_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/f875f965_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/61a0d340_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/f5496439_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/61a0d340_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/4f781a59_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/a8e25ebb_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/1b459024_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d98f6043_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/cab100c9_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/96105282_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/87c62767_nohash_1.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/815f0f03_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/b5d1e505_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/3824c00e_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/e95c70e2_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/135c6841_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/f3210686_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/f8ad3941_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/cfde27ba_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/4f781a59_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/ee483d85_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/b93528e3_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/fd32732a_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/d3badc9a_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/7dc95912_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/66a412a7_nohash_1.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/c3538de1_nohash_2.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/69f609ec_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/a2fefcb4_nohash_0.wav",
+      "action": "keep"
+    },
+    {
+      "filepath": "up/aeb99b1c_nohash_0.wav",
+      "action": "delete"
+    },
+    {
+      "filepath": "up/dcc012ec_nohash_1.wav",
+      "action": "keep"
+    }
+  ]
+}
