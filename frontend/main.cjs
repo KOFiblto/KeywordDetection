@@ -1,3 +1,4 @@
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 

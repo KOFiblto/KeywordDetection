@@ -3,75 +3,239 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Keyword Detection</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' http://localhost:5173 http://127.0.0.1:18000 http://127.0.0.1:5173; connect-src 'self' http://127.0.0.1:18000 http://localhost:5173 ws://localhost:5173 ws://127.0.0.1:5173 http://127.0.0.1:5173; img-src 'self' data:; media-src 'self' blob:;">
+    <title>Keyword Detection AI</title>
+    <!-- Modern Premium Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./src/style.css">
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>Keyword Detection AI</h1>
-        <div class="model-selector">
-          <label for="model-select">Model:</label>
-          <select id="model-select">
-            <option value="loading">Loading models...</option>
-          </select>
-          <button id="custom-model-btn">Browse Custom</button>
+    <div class="app-layout">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-logo">🎙️</div>
+          <div class="brand-text">
+            <h2>Auditory AI</h2>
+            <span>Keyword Sandbox</span>
+          </div>
         </div>
-      </header>
+        
+        <nav class="sidebar-nav">
+          <button class="sidebar-tab active" data-target="normal-mode">
+            <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" fill="currentColor"/>
+            </svg>
+            <span>Normal Mode</span>
+          </button>
+          <button class="sidebar-tab" data-target="live-mode">
+            <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" fill="currentColor"/>
+            </svg>
+            <span>Live Mode</span>
+          </button>
+          <button class="sidebar-tab" data-target="games-mode">
+            <svg class="tab-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="currentColor"/>
+            </svg>
+            <span>Voice Arcade</span>
+          </button>
+        </nav>
 
-      <div class="tabs">
-        <div class="tab active" data-target="normal-mode">Normal Mode</div>
-        <div class="tab" data-target="live-mode">Live Mode</div>
-      </div>
+        <div class="sidebar-footer">
+          <div class="model-panel">
+            <div class="model-panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+              <label for="model-select" style="margin-bottom: 0;">Active Model</label>
+              <span id="backend-status-badge" class="status-badge offline">Offline</span>
+            </div>
+            <select id="model-select">
+              <option value="loading">Loading models...</option>
+            </select>
+            <button id="custom-model-btn" class="secondary-btn">Browse Custom</button>
+          </div>
+        </div>
+      </aside>
 
-      <main>
+      <!-- MAIN CONTENT -->
+      <main class="main-content">
         <!-- NORMAL MODE -->
         <div id="normal-mode" class="mode-content active">
-          <div class="normal-mode-controls">
-            <button id="record-btn-normal" class="record-btn">Hold to Talk</button>
-            <div id="result-normal" class="result-display">Waiting for audio...</div>
+          <div class="mode-header">
+            <h2>Normal Mode</h2>
+            <p class="mode-desc">Hold the button, say one of the keywords ("Yes", "No", "Up", "Down"), and release to detect.</p>
+          </div>
+          
+          <div class="normal-mode-body">
+            <div class="normal-mode-controls">
+              <button id="record-btn-normal" class="record-btn-large">Hold to Talk</button>
+              <div id="result-normal" class="result-display">Waiting for audio...</div>
+            </div>
+            
+            <div class="mode-info-card">
+              <h3>How to use:</h3>
+              <ul>
+                <li>Press and hold the button.</li>
+                <li>Speak one keyword clearly (e.g. <b>"UP"</b>).</li>
+                <li>Release the button to perform keyword detection.</li>
+              </ul>
+            </div>
           </div>
         </div>
 
         <!-- LIVE MODE -->
         <div id="live-mode" class="mode-content">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button id="record-btn-live" class="record-btn" style="width: auto; height: auto; padding: 1rem 2rem; border-radius: 8px;">Start Live Stream</button>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-              <label for="interval-slider" style="color: var(--text-muted); font-size: 0.875rem;">Inference Interval: <span id="interval-display">200ms</span></label>
-              <input type="range" id="interval-slider" min="10" max="1000" value="200" step="10">
-            </div>
-            <div id="result-live" class="result-display" style="font-size: 1.5rem;">Ready</div>
+          <div class="mode-header">
+            <h2>Live Mode</h2>
+            <p class="mode-desc">Stream continuous microphone audio to run keyword detection automatically at regular intervals.</p>
           </div>
-
-          <div style="display: flex; gap: 1.5rem; margin-top: 2rem;">
-            <!-- Global Legend -->
-            <div style="width: 120px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 4px; padding: 1rem; flex-shrink: 0; display: flex; flex-direction: column;">
-              <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold; margin-bottom: 12px; text-transform: uppercase;">Legend</span>
-              <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.75rem; font-weight: 500;">
-                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #3b82f6; font-size: 1.2rem;">■</span> YES</span>
-                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #ef4444; font-size: 1.2rem;">■</span> NO</span>
-                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #10b981; font-size: 1.2rem;">■</span> UP</span>
-                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #f59e0b; font-size: 1.2rem;">■</span> DOWN</span>
-                <span style="display: flex; align-items: center; gap: 8px;"><span style="color: #a1a1a1; font-size: 1.2rem;">■</span> OTHER</span>
-              </div>
-            </div>
-
-            <div class="visualizers" style="flex-grow: 1; margin-top: 0;">
-              <div class="visualizer-box" style="height: 40px; padding: 0; display: flex;">
-                <div class="visualizer-label" style="top: 2px; left: 2px;">Detections</div>
-                <div id="detections" style="flex-grow: 1; height: 100%;"></div>
-              </div>
-
-              <div class="visualizer-box">
-                <div class="visualizer-label">Waveform (15s)</div>
-                <div id="waveform"></div>
+          
+          <div class="live-mode-body">
+            <div class="live-controls-bar">
+              <button id="record-btn-live" class="record-btn-live-toggle">Start Live Stream</button>
+              
+              <div class="slider-group">
+                <div class="slider-header">
+                  <span>Inference Interval</span>
+                  <span id="interval-display" class="badge">200ms</span>
+                </div>
+                <input type="range" id="interval-slider" min="10" max="1000" value="200" step="10">
               </div>
               
-              <div class="visualizer-box">
-                <div class="visualizer-label">Spectrogram (15s)</div>
-                <div id="spectrogram"></div>
+              <div class="live-indicator-display">
+                <span class="label">Detection</span>
+                <div id="result-live" class="result-display-live">Ready</div>
+              </div>
+            </div>
+
+            <div class="live-visualizer-container">
+              <!-- Global Legend -->
+              <aside class="legend-sidebar">
+                <span class="legend-title">Legend</span>
+                <div class="legend-items">
+                  <span class="legend-item"><span class="legend-color-dot color-yes"></span> YES</span>
+                  <span class="legend-item"><span class="legend-color-dot color-no"></span> NO</span>
+                  <span class="legend-item"><span class="legend-color-dot color-up"></span> UP</span>
+                  <span class="legend-item"><span class="legend-color-dot color-down"></span> DOWN</span>
+                  <span class="legend-item"><span class="legend-color-dot color-other"></span> OTHER</span>
+                </div>
+              </aside>
+
+              <div class="visualizers">
+                <div class="visualizer-box detections-box">
+                  <div class="visualizer-label">Detections Timeline (15s)</div>
+                  <div id="detections" class="canvas-wrap"></div>
+                </div>
+
+                <div class="visualizer-box">
+                  <div class="visualizer-label">Waveform (15s)</div>
+                  <div id="waveform" class="canvas-wrap"></div>
+                </div>
+                
+                <div class="visualizer-box">
+                  <div class="visualizer-label">Spectrogram (15s)</div>
+                  <div id="spectrogram" class="canvas-wrap"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GAMES MODE (VOICE ARCADE) -->
+        <div id="games-mode" class="mode-content">
+          <div class="mode-header">
+            <h2>Voice Arcade</h2>
+            <p class="mode-desc">Control video games using your voice keywords! Enable Voice Input in the game sidebar to play.</p>
+          </div>
+
+          <div class="games-body">
+            <!-- Game Sidebar -->
+            <div class="games-sidebar">
+              <div class="game-voice-control-card">
+                <div class="voice-status-indicator" id="game-voice-status-container">
+                  <span class="status-indicator-dot"></span>
+                  <span class="status-indicator-text" id="game-voice-status-text">Voice Input: Off</span>
+                </div>
+                <button id="game-voice-toggle" class="voice-toggle-btn">Enable Voice Input</button>
+                
+                <div class="slider-group" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                  <div class="slider-header">
+                    <span>Inference Interval</span>
+                    <span id="game-interval-display" class="badge">200ms</span>
+                  </div>
+                  <input type="range" id="game-interval-slider" min="10" max="1000" value="200" step="10">
+                </div>
+              </div>
+
+              <div class="game-selector">
+                <span class="selector-title">Select a Game</span>
+                <div class="game-buttons-list">
+                  <button class="game-btn active" data-game="flappy">
+                    <span class="game-btn-icon">🐦</span>
+                    <div class="game-btn-details">
+                      <span class="game-btn-name">Flappy Bird</span>
+                      <span class="game-btn-desc">Keyword: <b>"UP"</b> to flap</span>
+                    </div>
+                  </button>
+                  <button class="game-btn" data-game="grid">
+                    <span class="game-btn-icon">💎</span>
+                    <div class="game-btn-details">
+                      <span class="game-btn-name">Grid Runner</span>
+                      <span class="game-btn-desc">Keywords: <b>"UP", "DOWN", "YES", "NO"</b></span>
+                    </div>
+                  </button>
+                  <button class="game-btn" data-game="shooter">
+                    <span class="game-btn-icon">🚀</span>
+                    <div class="game-btn-details">
+                      <span class="game-btn-name">Space Defender</span>
+                      <span class="game-btn-desc">Keywords: <b>"YES", "NO", "UP", "DOWN"</b></span>
+                    </div>
+                  </button>
+                  <button class="game-btn" data-game="simon">
+                    <span class="game-btn-icon">🧠</span>
+                    <div class="game-btn-details">
+                      <span class="game-btn-name">Simon Memory</span>
+                      <span class="game-btn-desc">Turn-Based: Repeat sequence</span>
+                    </div>
+                  </button>
+                  <button class="game-btn" data-game="hilo">
+                    <span class="game-btn-icon">🃏</span>
+                    <div class="game-btn-details">
+                      <span class="game-btn-name">Cyber Hi-Lo</span>
+                      <span class="game-btn-desc">Turn-Based: <b>"UP"</b> / <b>"DOWN"</b> guess</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Game Screen / Display -->
+            <div class="game-display">
+              <div class="game-viewport">
+                <canvas id="game-canvas" width="600" height="400"></canvas>
+                
+                <div id="game-overlay" class="game-viewport-overlay visible">
+                  <div class="overlay-card">
+                    <h3 id="overlay-title">Flappy Bird</h3>
+                    <p id="overlay-instructions">Control the bird by saying "UP" to flap!</p>
+                    <button id="start-game-btn" class="start-btn-premium">Start Game</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Game Feedback Dashboard -->
+              <div class="game-dashboard">
+                <div class="dashboard-metric">
+                  <span class="metric-label">Last Voice Command</span>
+                  <div id="game-last-command" class="metric-value empty">Waiting...</div>
+                </div>
+                <div class="dashboard-metric">
+                  <span class="metric-label">Current Score</span>
+                  <div id="game-score" class="metric-value score">0</div>
+                </div>
+                <div class="dashboard-metric">
+                  <span class="metric-label">High Score</span>
+                  <div id="game-highscore" class="metric-value highscore">0</div>
+                </div>
               </div>
             </div>
           </div>
