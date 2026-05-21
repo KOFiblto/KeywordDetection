@@ -304,13 +304,23 @@ recordBtnNormal.addEventListener('mousedown', async () => {
     recordBtnNormal.textContent = 'Recording...';
     resultNormal.textContent = 'Listening...';
     
+    let stopped = false;
+    let autoCapTimeout;
+    
     const stopRecording = () => {
+        if (stopped) return;
+        stopped = true;
+        
+        if (autoCapTimeout) clearTimeout(autoCapTimeout);
+        
         source.disconnect();
         processor.disconnect();
         recordBtnNormal.classList.remove('recording');
         recordBtnNormal.textContent = 'Hold to Talk';
         
         let totalLen = capturedSamples.reduce((acc, val) => acc + val.length, 0);
+        if (totalLen === 0) return;
+        
         let flat = new Float32Array(totalLen);
         let offset = 0;
         for (let arr of capturedSamples) {
@@ -327,6 +337,7 @@ recordBtnNormal.addEventListener('mousedown', async () => {
         window.removeEventListener('mouseup', stopRecording);
     };
     
+    autoCapTimeout = setTimeout(stopRecording, 1000);
     window.addEventListener('mouseup', stopRecording);
 });
 
@@ -352,13 +363,23 @@ recordBtnNormal.addEventListener('touchstart', async (e) => {
     recordBtnNormal.textContent = 'Recording...';
     resultNormal.textContent = 'Listening...';
     
+    let stopped = false;
+    let autoCapTimeout;
+    
     const stopRecordingTouch = () => {
+        if (stopped) return;
+        stopped = true;
+        
+        if (autoCapTimeout) clearTimeout(autoCapTimeout);
+        
         source.disconnect();
         processor.disconnect();
         recordBtnNormal.classList.remove('recording');
         recordBtnNormal.textContent = 'Hold to Talk';
         
         let totalLen = capturedSamples.reduce((acc, val) => acc + val.length, 0);
+        if (totalLen === 0) return;
+        
         let flat = new Float32Array(totalLen);
         let offset = 0;
         for (let arr of capturedSamples) {
@@ -374,6 +395,7 @@ recordBtnNormal.addEventListener('touchstart', async (e) => {
         window.removeEventListener('touchend', stopRecordingTouch);
     };
     
+    autoCapTimeout = setTimeout(stopRecordingTouch, 1000);
     window.addEventListener('touchend', stopRecordingTouch);
 });
 
@@ -384,11 +406,11 @@ const ctxSpec = spectrogramCanvas.getContext('2d', { willReadFrequently: true })
 const ctxDet = detectionsCanvas.getContext('2d');
 
 const KEYWORD_COLORS = {
-    'YES': '#38bdf8',
-    'NO': '#f43f5e',
-    'UP': '#10b981',
-    'DOWN': '#fbbf24',
-    'OTHER': '#64748b'
+    'YES': '#ffffff',
+    'NO': '#888888',
+    'UP': '#aaaaaa',
+    'DOWN': '#666666',
+    'OTHER': '#444444'
 };
 
 let highlights = [];
@@ -422,7 +444,7 @@ function renderVisuals() {
         ctxWave.clearRect(waveformCanvas.width - speed, 0, speed, waveformCanvas.height);
         
         ctxWave.beginPath();
-        ctxWave.strokeStyle = '#38bdf8';
+        ctxWave.strokeStyle = '#ffffff';
         ctxWave.lineWidth = 2;
         for (let i = 0; i < wData.length; i++) {
             const v = wData[i] / 128.0;
@@ -443,10 +465,8 @@ function renderVisuals() {
         for (let i = 0; i < sData.length; i++) {
             const val = sData[i];
             const percent = val / 255;
-            const r = Math.floor(percent * 52);
-            const g = Math.floor(percent * 211);
-            const b = Math.floor(percent * 153 + (1-percent)*255);
-            ctxSpec.fillStyle = `rgb(${r},${g},${b})`;
+            const gray = Math.floor(percent * 255);
+            ctxSpec.fillStyle = `rgb(${gray},${gray},${gray})`;
             const y = spectrogramCanvas.height - (i / sData.length) * spectrogramCanvas.height;
             ctxSpec.fillRect(spectrogramCanvas.width - speed, y, speed, spectrogramCanvas.height / sData.length + 1);
         }

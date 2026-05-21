@@ -14,7 +14,7 @@
       <!-- SIDEBAR -->
       <aside class="sidebar">
         <div class="sidebar-brand">
-          <div class="brand-logo">🎙️</div>
+          <div class="brand-logo"><img src="./src/assets/brand_logo.png" class="brand-logo-img" alt="Logo"></div>
           <div class="brand-text">
             <h2>Auditory AI</h2>
             <span>Keyword Sandbox</span>
@@ -159,7 +159,7 @@
                 
                 <div class="slider-group" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                   <div class="slider-header">
-                    <span>Inference Interval</span>
+                     <span>Inference Interval</span>
                     <span id="game-interval-display" class="badge">200ms</span>
                   </div>
                   <input type="range" id="game-interval-slider" min="10" max="1000" value="200" step="10">
@@ -170,35 +170,57 @@
                 <span class="selector-title">Select a Game</span>
                 <div class="game-buttons-list">
                   <button class="game-btn active" data-game="flappy">
-                    <span class="game-btn-icon">🐦</span>
+                    <span class="game-btn-icon">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/>
+                      </svg>
+                    </span>
                     <div class="game-btn-details">
                       <span class="game-btn-name">Flappy Bird</span>
                       <span class="game-btn-desc">Keyword: <b>"UP"</b> to flap</span>
                     </div>
                   </button>
                   <button class="game-btn" data-game="grid">
-                    <span class="game-btn-icon">💎</span>
+                    <span class="game-btn-icon">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 12L12 2l6 10-6 10-6-10z"/>
+                      </svg>
+                    </span>
                     <div class="game-btn-details">
                       <span class="game-btn-name">Grid Runner</span>
                       <span class="game-btn-desc">Keywords: <b>"UP", "DOWN", "YES", "NO"</b></span>
                     </div>
                   </button>
                   <button class="game-btn" data-game="shooter">
-                    <span class="game-btn-icon">🚀</span>
+                    <span class="game-btn-icon">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2s-8 6-8 12c0 2 2 4 4 4v2l3-3h2l3 3v-2c2 0 4-2 4-4 0-6-8-12-8-12z"/>
+                        <path d="M9 15a3 3 0 0 1 6 0"/>
+                      </svg>
+                    </span>
                     <div class="game-btn-details">
                       <span class="game-btn-name">Space Defender</span>
                       <span class="game-btn-desc">Keywords: <b>"YES", "NO", "UP", "DOWN"</b></span>
                     </div>
                   </button>
                   <button class="game-btn" data-game="simon">
-                    <span class="game-btn-icon">🧠</span>
+                    <span class="game-btn-icon">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2zM14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2z"/>
+                      </svg>
+                    </span>
                     <div class="game-btn-details">
                       <span class="game-btn-name">Simon Memory</span>
                       <span class="game-btn-desc">Turn-Based: Repeat sequence</span>
                     </div>
                   </button>
                   <button class="game-btn" data-game="hilo">
-                    <span class="game-btn-icon">🃏</span>
+                    <span class="game-btn-icon">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="13" height="14" rx="2" ry="2"/>
+                        <path d="M8 21h10a2 2 0 0 0 2-2V7"/>
+                      </svg>
+                    </span>
                     <div class="game-btn-details">
                       <span class="game-btn-name">Cyber Hi-Lo</span>
                       <span class="game-btn-desc">Turn-Based: <b>"UP"</b> / <b>"DOWN"</b> guess</span>

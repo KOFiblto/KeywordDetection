@@ -1,5 +1,23 @@
 // Retro Audio Synth for game sound effects
 let audioSynthCtx = null;
+
+// Helper for backward compatibility with older browsers/electron context.roundRect
+function drawRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(x, y, w, h, r);
+    } else {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+}
+
 function playSound(type) {
     try {
         if (!audioSynthCtx) {
@@ -80,11 +98,11 @@ class FlappyBird {
         this.onScore = onScore;
         this.onGameOver = onGameOver;
         
-        this.bird = { x: 80, y: 180, radius: 14, velocity: 0, gravity: 0.015, jump: -1.0 };
+        this.bird = { x: 80, y: 180, radius: 14, velocity: 0, gravity: 0.0003, jump: -0.16 };
         this.pipes = [];
         this.pipeWidth = 60;
         this.pipeGap = 185;
-        this.pipeSpeed = 0.35;
+        this.pipeSpeed = 0.25;
         this.frameCount = 0;
         this.score = 0;
         this.isPlaying = false;
@@ -127,7 +145,7 @@ class FlappyBird {
                     vy: (Math.random() - 0.5) * 4,
                     alpha: 1.0,
                     size: Math.random() * 3 + 2,
-                    color: 'rgba(0, 210, 255, 0.8)'
+                    color: 'rgba(255, 255, 255, 0.6)'
                 });
             }
         }
@@ -139,6 +157,10 @@ class FlappyBird {
         this.frameCount++;
         
         this.bird.velocity += this.bird.gravity;
+        // Cap falling velocity for slower, gentler descent
+        if (this.bird.velocity > 0.04) {
+            this.bird.velocity = 0.04;
+        }
         this.bird.y += this.bird.velocity;
         
         // Ground and ceiling crash check
@@ -160,7 +182,7 @@ class FlappyBird {
         this.particles = this.particles.filter(p => p.alpha > 0);
         
         // Spawn pipes
-        if (this.frameCount % 480 === 0) {
+        if (this.frameCount % 700 === 0) {
             this.spawnPipe();
         }
         
@@ -194,8 +216,8 @@ class FlappyBird {
     draw() {
         // Space-y backdrop
         const skyGrad = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        skyGrad.addColorStop(0, '#060913');
-        skyGrad.addColorStop(1, '#0e1526');
+        skyGrad.addColorStop(0, '#000000');
+        skyGrad.addColorStop(1, '#080808');
         this.ctx.fillStyle = skyGrad;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
@@ -207,27 +229,27 @@ class FlappyBird {
             this.ctx.fillRect(starX < 0 ? starX + this.canvas.width : starX, starY, 2, 2);
         }
         
-        // Draw pipes (neon theme)
+        // Draw pipes (B&W theme)
         this.pipes.forEach(pipe => {
             const pipeGrad = this.ctx.createLinearGradient(pipe.x, 0, pipe.x + this.pipeWidth, 0);
-            pipeGrad.addColorStop(0, '#00df89');
-            pipeGrad.addColorStop(1, '#00ab69');
+            pipeGrad.addColorStop(0, '#1c1c1c');
+            pipeGrad.addColorStop(1, '#0a0a0a');
             this.ctx.fillStyle = pipeGrad;
             
             this.ctx.shadowBlur = 8;
-            this.ctx.shadowColor = 'rgba(0, 223, 137, 0.5)';
+            this.ctx.shadowColor = 'rgba(255, 255, 255, 0.05)';
             
             // Top pipe body
             this.ctx.fillRect(pipe.x, 0, this.pipeWidth, pipe.topHeight);
             // Top pipe lip
-            this.ctx.fillStyle = '#00ffaa';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(pipe.x - 4, pipe.topHeight - 16, this.pipeWidth + 8, 16);
             
             // Bottom pipe body
             this.ctx.fillStyle = pipeGrad;
             this.ctx.fillRect(pipe.x, this.canvas.height - pipe.bottomHeight, this.pipeWidth, pipe.bottomHeight);
             // Bottom pipe lip
-            this.ctx.fillStyle = '#00ffaa';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(pipe.x - 4, this.canvas.height - pipe.bottomHeight, this.pipeWidth + 8, 16);
             
             this.ctx.shadowBlur = 0;
@@ -244,35 +266,35 @@ class FlappyBird {
         this.ctx.globalAlpha = 1.0;
         
         // Ground bar
-        this.ctx.fillStyle = '#111827';
+        this.ctx.fillStyle = '#0a0a0a';
         this.ctx.fillRect(0, this.canvas.height - 25, this.canvas.width, 25);
-        this.ctx.strokeStyle = '#1f2937';
+        this.ctx.strokeStyle = '#222222';
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         this.ctx.moveTo(0, this.canvas.height - 25);
         this.ctx.lineTo(this.canvas.width, this.canvas.height - 25);
         this.ctx.stroke();
         
-        // Bird (Cyan Cyber-Spherical Jet)
+        // Bird (Sleek monochrome jet)
         const b = this.bird;
         this.ctx.shadowBlur = 12;
-        this.ctx.shadowColor = '#00d2ff';
+        this.ctx.shadowColor = '#ffffff';
         
         // Body
-        this.ctx.fillStyle = '#00d2ff';
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
         this.ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
         this.ctx.fill();
         this.ctx.shadowBlur = 0;
         
         // Eye
-        this.ctx.fillStyle = '#060913';
+        this.ctx.fillStyle = '#000000';
         this.ctx.beginPath();
         this.ctx.arc(b.x + 5, b.y - 3, 3, 0, Math.PI * 2);
         this.ctx.fill();
         
         // Beak
-        this.ctx.fillStyle = '#ff7b00';
+        this.ctx.fillStyle = '#cccccc';
         this.ctx.beginPath();
         this.ctx.moveTo(b.x + b.radius - 2, b.y - 3);
         this.ctx.lineTo(b.x + b.radius + 6, b.y);
@@ -281,7 +303,7 @@ class FlappyBird {
         this.ctx.fill();
         
         // Wing (wiggles)
-        this.ctx.fillStyle = '#0080ff';
+        this.ctx.fillStyle = '#888888';
         const wingOffset = b.velocity < 0 ? -3 : 3;
         this.ctx.beginPath();
         this.ctx.ellipse(b.x - 5, b.y + 1, 7, 4 + Math.abs(wingOffset), Math.PI/6, 0, Math.PI * 2);
@@ -392,7 +414,7 @@ class GridRunner {
                         vy: (Math.random() - 0.5) * 3 - dy * 1.5,
                         alpha: 1.0,
                         size: Math.random() * 2.5 + 1.5,
-                        color: 'rgba(255, 46, 147, 0.8)'
+                        color: 'rgba(255, 255, 255, 0.8)'
                     });
                 }
                 
@@ -421,7 +443,7 @@ class GridRunner {
                         vy: (Math.random() - 0.5) * 5,
                         alpha: 1.0,
                         size: Math.random() * 3 + 1,
-                        color: '#ffab00'
+                        color: '#ffffff'
                     });
                 }
                 
@@ -478,11 +500,11 @@ class GridRunner {
     
     draw() {
         // Dark grid background
-        this.ctx.fillStyle = '#090d16';
+        this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Draw gridlines
-        this.ctx.strokeStyle = '#1e293b';
+        this.ctx.strokeStyle = '#121212';
         this.ctx.lineWidth = 1;
         for (let c = 0; c <= this.cols; c++) {
             this.ctx.beginPath();
@@ -515,8 +537,8 @@ class GridRunner {
             const gy = (gem.y + 0.5) * this.cellH;
             
             this.ctx.shadowBlur = 10;
-            this.ctx.shadowColor = '#ffba00';
-            this.ctx.fillStyle = '#ffba00';
+            this.ctx.shadowColor = '#ffffff';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.beginPath();
             this.ctx.moveTo(gx, gy - size);
             this.ctx.lineTo(gx + size, gy);
@@ -527,15 +549,17 @@ class GridRunner {
             this.ctx.shadowBlur = 0;
         });
         
-        // Draw enemies (danger pink spikes)
+        // Draw enemies (danger spikes)
         this.enemies.forEach(e => {
             const ex = (e.x + 0.5) * this.cellW;
             const ey = (e.y + 0.5) * this.cellH;
             const size = 11;
             
             this.ctx.shadowBlur = 10;
-            this.ctx.shadowColor = '#ff2e93';
-            this.ctx.fillStyle = '#ff2e93';
+            this.ctx.shadowColor = '#444444';
+            this.ctx.fillStyle = '#222222';
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = 1.5;
             
             this.ctx.beginPath();
             this.ctx.moveTo(ex, ey - size);
@@ -543,6 +567,7 @@ class GridRunner {
             this.ctx.lineTo(ex - size, ey + size * 0.7);
             this.ctx.closePath();
             this.ctx.fill();
+            this.ctx.stroke();
             
             // Draw core eye
             this.ctx.fillStyle = '#ffffff';
@@ -559,8 +584,8 @@ class GridRunner {
         const size = 11;
         
         this.ctx.shadowBlur = 12;
-        this.ctx.shadowColor = '#00d2ff';
-        this.ctx.fillStyle = '#00d2ff';
+        this.ctx.shadowColor = '#ffffff';
+        this.ctx.fillStyle = '#ffffff';
         
         this.ctx.beginPath();
         this.ctx.moveTo(px, py - size);
@@ -570,7 +595,7 @@ class GridRunner {
         this.ctx.closePath();
         this.ctx.fill();
         
-        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillStyle = '#000000';
         this.ctx.beginPath();
         this.ctx.arc(px, py, 3, 0, Math.PI * 2);
         this.ctx.fill();
@@ -617,6 +642,7 @@ class SpaceDefender {
         this.isPlaying = false;
         this.frameCount = 0;
         this.spawnRate = 350;
+        this.lastSpawnFrame = 0;
         
         for (let i = 0; i < 40; i++) {
             this.stars.push({
@@ -644,6 +670,7 @@ class SpaceDefender {
         this.isPlaying = true;
         this.frameCount = 0;
         this.spawnRate = 350;
+        this.lastSpawnFrame = -90;
     }
     
     handleCommand(cmd) {
@@ -706,9 +733,9 @@ class SpaceDefender {
             }
         });
         
-        // Spawn falling debris / enemies
-        if (this.frameCount % this.spawnRate === 0) {
-            const size = Math.random() * 18 + 14;
+        // Spawn falling debris / enemies (Max 2 onscreen, 3.5x size)
+        if (this.invaders.length < 2 && (this.frameCount - this.lastSpawnFrame >= 90)) {
+            const size = (Math.random() * 18 + 14) * 3.5;
             this.invaders.push({
                 x: Math.random() * (this.canvas.width - size),
                 y: -size,
@@ -718,7 +745,7 @@ class SpaceDefender {
                 rot: Math.random() * Math.PI,
                 rotSpeed: (Math.random() - 0.5) * 0.06
             });
-            this.spawnRate = Math.max(160, 350 - Math.floor(this.score / 2) * 10);
+            this.lastSpawnFrame = this.frameCount;
         }
         
         // Move invaders
@@ -754,7 +781,7 @@ class SpaceDefender {
                             vy: (Math.random() - 0.5) * 7,
                             alpha: 1.0,
                             size: Math.random() * 3 + 1,
-                            color: '#ff2e93'
+                            color: '#ffffff'
                         });
                     }
                 }
@@ -778,7 +805,7 @@ class SpaceDefender {
                             vy: (Math.random() - 0.5) * 5,
                             alpha: 1.0,
                             size: Math.random() * 2 + 1,
-                            color: '#00d2ff'
+                            color: '#ffffff'
                         });
                     }
                 } else {
@@ -806,26 +833,26 @@ class SpaceDefender {
     }
     
     draw() {
-        // Cosmos theme
-        this.ctx.fillStyle = '#040713';
+        // Cosmos theme (monochrome)
+        this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Stars
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         this.stars.forEach(s => {
             this.ctx.fillRect(s.x, s.y, s.size, s.size);
         });
         
-        // Draw lasers (neon beams)
+        // Draw lasers (white beams)
         this.lasers.forEach(l => {
             this.ctx.shadowBlur = 6;
-            this.ctx.shadowColor = '#00d2ff';
-            this.ctx.fillStyle = '#00d2ff';
+            this.ctx.shadowColor = '#ffffff';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(l.x - 2, l.y, 4, 12);
             this.ctx.shadowBlur = 0;
         });
         
-        // Draw debris (rocks)
+        // Draw debris (rocks - styled in B&W outline)
         this.invaders.forEach(inv => {
             this.ctx.save();
             const cx = inv.x + inv.w / 2;
@@ -834,8 +861,10 @@ class SpaceDefender {
             this.ctx.rotate(inv.rot);
             
             this.ctx.shadowBlur = 6;
-            this.ctx.shadowColor = '#ff2e93';
-            this.ctx.fillStyle = '#ff2e93';
+            this.ctx.shadowColor = '#333333';
+            this.ctx.fillStyle = '#1c1c1c';
+            this.ctx.strokeStyle = '#cccccc';
+            this.ctx.lineWidth = 2;
             
             this.ctx.beginPath();
             const points = 7;
@@ -849,6 +878,7 @@ class SpaceDefender {
             }
             this.ctx.closePath();
             this.ctx.fill();
+            this.ctx.stroke();
             
             this.ctx.restore();
             this.ctx.shadowBlur = 0;
@@ -871,12 +901,12 @@ class SpaceDefender {
             this.ctx.save();
             this.ctx.globalAlpha = 0.22 + (Math.sin(this.frameCount * 0.2) * 0.08);
             this.ctx.shadowBlur = 12;
-            this.ctx.shadowColor = '#00d2ff';
-            this.ctx.fillStyle = '#00d2ff';
+            this.ctx.shadowColor = '#ffffff';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
             this.ctx.beginPath();
             this.ctx.arc(p.x + p.w / 2, p.y + p.h / 2, Math.max(p.w, p.h) * 0.9, 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.strokeStyle = '#00d2ff';
+            this.ctx.strokeStyle = '#ffffff';
             this.ctx.lineWidth = 1.5;
             this.ctx.stroke();
             this.ctx.restore();
@@ -884,7 +914,7 @@ class SpaceDefender {
         }
         
         // Spaceship shape
-        this.ctx.fillStyle = '#00d2ff';
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.beginPath();
         this.ctx.moveTo(p.x + p.w / 2, p.y); // nose
         this.ctx.lineTo(p.x + p.w, p.y + p.h); // wing right
@@ -895,7 +925,7 @@ class SpaceDefender {
         this.ctx.fill();
         
         // Cockpit
-        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillStyle = '#000000';
         this.ctx.beginPath();
         this.ctx.moveTo(p.x + p.w / 2, p.y + 6);
         this.ctx.lineTo(p.x + p.w * 0.62, p.y + p.h * 0.52);
@@ -903,9 +933,9 @@ class SpaceDefender {
         this.ctx.closePath();
         this.ctx.fill();
         
-        // Engine fire
+        // Engine fire (gray thruster glow)
         if (this.frameCount % 4 < 2) {
-            this.ctx.fillStyle = '#ffab00';
+            this.ctx.fillStyle = '#888888';
             this.ctx.beginPath();
             this.ctx.moveTo(p.x + p.w * 0.38, p.y + p.h * 0.82);
             this.ctx.lineTo(p.x + p.w / 2, p.y + p.h * 1.15);
@@ -915,20 +945,30 @@ class SpaceDefender {
         }
         
         // Draw HUD overlay (Lives and Shield Cooldown)
-        this.ctx.fillStyle = '#ef4444';
-        this.ctx.font = '500 13px "Outfit", sans-serif';
-        this.ctx.fillText('LIVES: ', 15, 23);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '600 12px "Outfit", sans-serif';
+        this.ctx.fillText('LIVES: ', 15, 22);
         for (let i = 0; i < this.lives; i++) {
-            this.ctx.fillText('❤️', 60 + i * 16, 23);
+            // Draw a neat vector heart
+            const hx = 60 + i * 18;
+            const hy = 12;
+            const hs = 10;
+            this.ctx.beginPath();
+            this.ctx.moveTo(hx, hy + hs / 4);
+            this.ctx.bezierCurveTo(hx, hy, hx - hs/2, hy, hx - hs/2, hy + hs/2);
+            this.ctx.bezierCurveTo(hx - hs/2, hy + hs*0.8, hx, hy + hs*1.1, hx, hy + hs);
+            this.ctx.bezierCurveTo(hx, hy + hs*1.1, hx + hs/2, hy + hs*0.8, hx + hs/2, hy + hs/2);
+            this.ctx.bezierCurveTo(hx + hs/2, hy, hx, hy, hx, hy + hs / 4);
+            this.ctx.fill();
         }
         
         // Shield status
         if (p.shieldCooldown > 0) {
-            this.ctx.fillStyle = '#ffab00';
-            this.ctx.fillText(`SHIELD COOLDOWN: ${(p.shieldCooldown / 60).toFixed(1)}s`, this.canvas.width - 180, 23);
+            this.ctx.fillStyle = '#888888';
+            this.ctx.fillText(`SHIELD COOLDOWN: ${(p.shieldCooldown / 60).toFixed(1)}s`, this.canvas.width - 180, 22);
         } else {
-            this.ctx.fillStyle = '#00df89';
-            this.ctx.fillText('SHIELD READY [DOWN]', this.canvas.width - 180, 23);
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.fillText('SHIELD READY [DOWN]', this.canvas.width - 180, 22);
         }
     }
     
@@ -958,12 +998,12 @@ class SimonMemory {
         this.score = 0;
         this.isPlaying = false;
         
-        // Colors for Simon buttons
+        // Colors for Simon buttons (B&W/Grayscale)
         this.panels = {
-            'UP': { color: 'rgba(16, 185, 129, 0.25)', activeColor: 'rgba(16, 185, 129, 0.9)', x: 230, y: 50, w: 140, h: 80, text: 'UP (Green)' },
-            'DOWN': { color: 'rgba(251, 191, 36, 0.25)', activeColor: 'rgba(251, 191, 36, 0.9)', x: 230, y: 250, w: 140, h: 80, text: 'DOWN (Yellow)' },
-            'YES': { color: 'rgba(56, 189, 248, 0.25)', activeColor: 'rgba(56, 189, 248, 0.9)', x: 390, y: 150, w: 140, h: 80, text: 'YES (Right)' },
-            'NO': { color: 'rgba(244, 63, 94, 0.25)', activeColor: 'rgba(244, 63, 94, 0.9)', x: 70, y: 150, w: 140, h: 80, text: 'NO (Left)' }
+            'UP': { color: 'rgba(255, 255, 255, 0.05)', activeColor: 'rgba(255, 255, 255, 0.95)', x: 230, y: 50, w: 140, h: 80 },
+            'DOWN': { color: 'rgba(255, 255, 255, 0.05)', activeColor: 'rgba(255, 255, 255, 0.95)', x: 230, y: 250, w: 140, h: 80 },
+            'YES': { color: 'rgba(255, 255, 255, 0.05)', activeColor: 'rgba(255, 255, 255, 0.95)', x: 390, y: 150, w: 140, h: 80 },
+            'NO': { color: 'rgba(255, 255, 255, 0.05)', activeColor: 'rgba(255, 255, 255, 0.95)', x: 70, y: 150, w: 140, h: 80 }
         };
         this.activePanel = null;
     }
@@ -983,7 +1023,7 @@ class SimonMemory {
         this.playerSequence = [];
         this.state = 'showing';
         this.showIndex = 0;
-        this.showTimer = 45; // Delay before starting flash
+        this.showTimer = 35; // Initial delay before sequence starts
         this.activePanel = null;
         this.message = "Watch the sequence!";
     }
@@ -1023,39 +1063,48 @@ class SimonMemory {
     update() {
         if (!this.isPlaying) return;
         
-        if (this.showTimer > 0) {
-            this.showTimer--;
-            if (this.showTimer === 0) {
-                this.activePanel = null;
-                
-                if (this.state === 'showing') {
-                    // Highlight next in sequence or finish showing
+        if (this.state === 'showing') {
+            if (this.showTimer > 0) {
+                this.showTimer--;
+            }
+            if (this.showTimer <= 0) {
+                if (this.activePanel !== null) {
+                    // We were flashing a panel, now turn it off and pause
+                    this.activePanel = null;
                     this.showIndex++;
                     if (this.showIndex >= this.sequence.length) {
                         this.state = 'inputting';
                         this.message = "Your turn! Repeat the sequence.";
                     } else {
-                        this.showTimer = 35; // Pause between flashes
+                        this.showTimer = 15; // Pause between flashes
                     }
-                } else if (this.state === 'success') {
-                    this.nextRound();
+                } else {
+                    // We were in initial delay or inter-panel pause, now flash the next panel
+                    this.activePanel = this.sequence[this.showIndex];
+                    this.showTimer = 25; // Glow duration
+                    playSound('flap'); // Play light blip
                 }
             }
-        } else if (this.state === 'showing' && this.activePanel === null) {
-            // Trigger highlight for the current step in showing sequence
-            this.activePanel = this.sequence[this.showIndex];
-            this.showTimer = 30; // Glow duration
-            playSound('flap'); // Play light blip
+        } else {
+            if (this.showTimer > 0) {
+                this.showTimer--;
+                if (this.showTimer === 0) {
+                    this.activePanel = null;
+                    if (this.state === 'success') {
+                        this.nextRound();
+                    }
+                }
+            }
         }
     }
     
     draw() {
-        // Cosmos-y theme background
-        this.ctx.fillStyle = '#060913';
+        // Dark theme background
+        this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Grid background lines for cyber look
-        this.ctx.strokeStyle = 'rgba(30, 41, 59, 0.3)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
         this.ctx.lineWidth = 1;
         for (let i = 0; i < this.canvas.width; i += 40) {
             this.ctx.beginPath();
@@ -1077,7 +1126,7 @@ class SimonMemory {
         this.ctx.fillText('SIMON MEMORY', this.canvas.width / 2, 28);
         
         // Draw instruction message
-        this.ctx.fillStyle = this.state === 'inputting' ? '#38bdf8' : '#94a3b8';
+        this.ctx.fillStyle = this.state === 'inputting' ? '#ffffff' : '#888888';
         this.ctx.font = '500 13px "Outfit", sans-serif';
         this.ctx.fillText(this.message, this.canvas.width / 2, 380);
         
@@ -1096,18 +1145,16 @@ class SimonMemory {
             }
             
             // Draw panel box
-            this.ctx.strokeStyle = isActive ? '#ffffff' : 'rgba(255,255,255,0.05)';
+            this.ctx.strokeStyle = isActive ? '#ffffff' : 'rgba(255,255,255,0.08)';
             this.ctx.lineWidth = isActive ? 2 : 1;
             
-            // Round rect draw helper
-            this.ctx.beginPath();
-            this.ctx.roundRect(p.x, p.y, p.w, p.h, 8);
+            drawRoundRect(this.ctx, p.x, p.y, p.w, p.h, 8);
             this.ctx.fill();
             this.ctx.stroke();
             
             // Label text inside panel
             this.ctx.shadowBlur = 0;
-            this.ctx.fillStyle = isActive ? '#060913' : '#f8fafc';
+            this.ctx.fillStyle = isActive ? '#000000' : '#ffffff';
             this.ctx.font = '700 14px "Outfit", sans-serif';
             this.ctx.fillText(key, p.x + p.w / 2, p.y + p.h / 2 + 5);
             this.ctx.restore();
@@ -1115,7 +1162,7 @@ class SimonMemory {
         
         // Draw progress status
         if (this.state === 'inputting') {
-            this.ctx.fillStyle = '#94a3b8';
+            this.ctx.fillStyle = '#888888';
             this.ctx.font = '500 12px "Outfit", sans-serif';
             this.ctx.fillText(`Progress: ${this.playerSequence.length} / ${this.sequence.length}`, this.canvas.width / 2, 220);
         }
@@ -1217,12 +1264,12 @@ class CyberHiLo {
     }
     
     draw() {
-        // Futuristic green casino table background
-        this.ctx.fillStyle = '#021814';
+        // Pure black casino table background
+        this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // Neon borders
-        this.ctx.strokeStyle = '#00df89';
+        // Gray borders
+        this.ctx.strokeStyle = '#333333';
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(10, 10, this.canvas.width - 20, this.canvas.height - 20);
         
@@ -1232,12 +1279,28 @@ class CyberHiLo {
         this.ctx.textAlign = 'center';
         this.ctx.fillText('CYBER HI-LO', this.canvas.width / 2, 32);
         
-        // Draw Hearts/Lives
-        this.ctx.fillStyle = '#f43f5e';
-        this.ctx.font = '14px "Outfit", sans-serif';
-        let hearts = '';
-        for (let i = 0; i < this.lives; i++) hearts += '❤️ ';
-        this.ctx.fillText(hearts || '☠️', this.canvas.width / 2, 58);
+        // Draw Hearts/Lives as vector graphics centered
+        this.ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < 3; i++) {
+            const hx = this.canvas.width / 2 - (3 * 18) / 2 + i * 18;
+            const hy = 48;
+            const hs = 10;
+            this.ctx.beginPath();
+            this.ctx.moveTo(hx, hy + hs / 4);
+            this.ctx.bezierCurveTo(hx, hy, hx - hs/2, hy, hx - hs/2, hy + hs/2);
+            this.ctx.bezierCurveTo(hx - hs/2, hy + hs*0.8, hx, hy + hs*1.1, hx, hy + hs);
+            this.ctx.bezierCurveTo(hx, hy + hs*1.1, hx + hs/2, hy + hs*0.8, hx + hs/2, hy + hs/2);
+            this.ctx.bezierCurveTo(hx + hs/2, hy, hx, hy, hx, hy + hs / 4);
+            
+            if (i < this.lives) {
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fill();
+            } else {
+                this.ctx.strokeStyle = '#222222';
+                this.ctx.lineWidth = 1.5;
+                this.ctx.stroke();
+            }
+        }
         
         // Draw Card slots
         const cardW = 100;
@@ -1255,20 +1318,20 @@ class CyberHiLo {
         }
         
         // Labels
-        this.ctx.fillStyle = '#94a3b8';
+        this.ctx.fillStyle = '#888888';
         this.ctx.font = '600 11px "Outfit", sans-serif';
         this.ctx.fillText('CURRENT CARD', 200, 280);
         this.ctx.fillText('NEXT CARD', 400, 280);
         
         // Guess Arrow indicator
         if (this.guess) {
-            this.ctx.fillStyle = this.guess === 'UP' ? '#10b981' : '#f43f5e';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.font = '700 24px "Outfit", sans-serif';
             this.ctx.fillText(this.guess === 'UP' ? '▲ HIGHER' : '▼ LOWER', this.canvas.width / 2, 320);
         }
         
         // Draw Instruction / Message
-        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.font = '600 13px "Outfit", sans-serif';
         this.ctx.fillText(this.message, this.canvas.width / 2, 355);
     }
@@ -1278,22 +1341,21 @@ class CyberHiLo {
         
         // Shadow card background
         this.ctx.shadowBlur = 10;
-        this.ctx.shadowColor = faceDown ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+        this.ctx.shadowColor = 'rgba(255, 255, 255, 0.1)';
         
         // Draw card base
-        this.ctx.fillStyle = faceDown ? '#0c172a' : '#ffffff';
-        this.ctx.strokeStyle = faceDown ? '#38bdf8' : '#e2e8f0';
+        this.ctx.fillStyle = faceDown ? '#121212' : '#ffffff';
+        this.ctx.strokeStyle = faceDown ? '#444444' : '#e2e8f0';
         this.ctx.lineWidth = 2;
         
-        this.ctx.beginPath();
-        this.ctx.roundRect(x, y, w, h, 8);
+        drawRoundRect(this.ctx, x, y, w, h, 8);
         this.ctx.fill();
         this.ctx.stroke();
         this.ctx.shadowBlur = 0;
         
         if (faceDown) {
-            // Draw card back details (cyber grid + question mark)
-            this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+            // Draw card back details (monochrome grid + question mark)
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
             this.ctx.lineWidth = 1;
             for (let i = x + 10; i < x + w; i += 12) {
                 this.ctx.beginPath();
@@ -1301,13 +1363,13 @@ class CyberHiLo {
                 this.ctx.lineTo(i, y + h);
                 this.ctx.stroke();
             }
-            this.ctx.fillStyle = '#38bdf8';
+            this.ctx.fillStyle = '#ffffff';
             this.ctx.font = '700 28px "Outfit", sans-serif';
             this.ctx.fillText('?', x + w/2, y + h/2 + 10);
         } else {
-            // Draw card face details (numbers and cyber suit)
+            // Draw card face details (numbers and suits - all black-and-white)
             const isRed = val % 2 === 0;
-            this.ctx.fillStyle = isRed ? '#f43f5e' : '#0f172a';
+            this.ctx.fillStyle = '#0f172a'; // force all text to dark charcoal for monochrome
             this.ctx.font = '700 20px "Outfit", sans-serif';
             this.ctx.textAlign = 'left';
             
@@ -1315,7 +1377,7 @@ class CyberHiLo {
             const displayVal = val === 1 ? 'A' : val === 11 ? 'J' : val === 12 ? 'Q' : val === 13 ? 'K' : val.toString();
             this.ctx.fillText(displayVal, x + 8, y + 24);
             
-            // Cyber Suit Center
+            // Suit Center
             const suit = isRed ? '✦' : '⚛';
             this.ctx.font = '36px "Outfit", sans-serif';
             this.ctx.textAlign = 'center';
@@ -1411,7 +1473,7 @@ export function switchGame(gameName) {
     
     if (gameName === 'flappy') {
         titleEl.textContent = 'Flappy Bird';
-        descEl.innerHTML = 'Control the bird by saying <b>"UP"</b> to flap!<br>Avoid the pipes to score points.<br><span class="font-small text-muted">(Keyboard: Space / ArrowUp)</span>';
+        descEl.innerHTML = 'Control the bird by saying <b>"UP"</b> to flap!<br>Avoid the obstacles to score points.<br><span class="font-small text-muted">(Keyboard: Space / ArrowUp)</span>';
         activeGame = new FlappyBird(uiElements.canvas, onScore, onGameOver);
     } else if (gameName === 'grid') {
         titleEl.textContent = 'Grid Runner';
