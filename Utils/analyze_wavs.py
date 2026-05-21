@@ -2,6 +2,7 @@ import os
 import numpy as np
 import soundfile as sf
 import matplotlib.pyplot as plt
+import config_loader
 
 import json
 def load_keywords():
@@ -17,7 +18,7 @@ def load_keywords():
 def analyze_dataset():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "..", "dataset"))
-    classes = get_keywords()
+    classes = config_loader.get_keywords()
     
     durations = []
     sample_rates = set()
@@ -69,7 +70,7 @@ def analyze_dataset():
         idx = sorted_indices[i]
         frames = unique_frames[idx]
         count = counts[idx]
-        target_sr = get_config_value('target_sample_rate', 16000)
+        target_sr = config_loader.get_config_value('target_sample_rate', 16000)
         duration_sec = frames / target_sr
         percentage = (count / len(durations)) * 100
         lines.append(f"  {frames} samples ({duration_sec:.4f}s): {count} files ({percentage:.1f}%)")
