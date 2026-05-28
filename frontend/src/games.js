@@ -116,6 +116,7 @@ class FlappyBird {
         this.score = 0;
         this.isPlaying = true;
         this.frameCount = 0;
+        this.pipeSpawnTimer = 0;
         this.particles = [];
         this.spawnPipe();
     }
@@ -154,14 +155,15 @@ class FlappyBird {
     update() {
         if (!this.isPlaying) return;
         
-        this.frameCount++;
+        const speed = window.gameSpeedMultiplier || 1.0;
+        this.frameCount += speed;
         
-        this.bird.velocity += this.bird.gravity;
+        this.bird.velocity += this.bird.gravity * speed;
         // Cap falling velocity for slower, gentler descent
         if (this.bird.velocity > 0.04) {
             this.bird.velocity = 0.04;
         }
-        this.bird.y += this.bird.velocity;
+        this.bird.y += this.bird.velocity * speed;
         
         // Ground and ceiling crash check
         if (this.bird.y + this.bird.radius > this.canvas.height - 25) {
@@ -175,20 +177,22 @@ class FlappyBird {
         
         // Particle animations
         this.particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.alpha -= 0.04;
+            p.x += p.vx * speed;
+            p.y += p.vy * speed;
+            p.alpha -= 0.04 * speed;
         });
         this.particles = this.particles.filter(p => p.alpha > 0);
         
         // Spawn pipes
-        if (this.frameCount % 700 === 0) {
+        this.pipeSpawnTimer = (this.pipeSpawnTimer || 0) + speed;
+        if (this.pipeSpawnTimer >= 700) {
+            this.pipeSpawnTimer -= 700;
             this.spawnPipe();
         }
         
         // Move & collide pipes
         this.pipes.forEach(pipe => {
-            pipe.x -= this.pipeSpeed;
+            pipe.x -= this.pipeSpeed * speed;
             
             // Check pass
             if (!pipe.passed && pipe.x + this.pipeWidth < this.bird.x) {
@@ -352,6 +356,7 @@ class GridRunner {
         this.isPlaying = true;
         this.frameCount = 0;
         this.enemyMoveInterval = 200;
+        this.enemyMoveTimer = 0;
         this.particles = [];
         
         this.spawnGem();
@@ -466,18 +471,21 @@ class GridRunner {
     update() {
         if (!this.isPlaying) return;
         
-        this.frameCount++;
+        const speed = window.gameSpeedMultiplier || 1.0;
+        this.frameCount += speed;
         
         // Update particles
         this.particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.alpha -= 0.05;
+            p.x += p.vx * speed;
+            p.y += p.vy * speed;
+            p.alpha -= 0.05 * speed;
         });
         this.particles = this.particles.filter(p => p.alpha > 0);
         
         // Move enemies toward player
-        if (this.frameCount % this.enemyMoveInterval === 0) {
+        this.enemyMoveTimer = (this.enemyMoveTimer || 0) + speed;
+        if (this.enemyMoveTimer >= this.enemyMoveInterval) {
+            this.enemyMoveTimer -= this.enemyMoveInterval;
             this.enemies.forEach(e => {
                 const dx = this.player.x - e.x;
                 const dy = this.player.y - e.y;
@@ -670,7 +678,7 @@ class SpaceDefender {
         this.isPlaying = true;
         this.frameCount = 0;
         this.spawnRate = 350;
-        this.lastSpawnFrame = -90;
+        this.spawnTimer = 0;
     }
     
     handleCommand(cmd) {
@@ -700,25 +708,26 @@ class SpaceDefender {
     update() {
         if (!this.isPlaying) return;
         
-        this.frameCount++;
+        const speed = window.gameSpeedMultiplier || 1.0;
+        this.frameCount += speed;
         
         // Ship movement smoothing
-        this.player.x += (this.player.targetX - this.player.x) * 0.18;
+        this.player.x += (this.player.targetX - this.player.x) * 0.18 * speed;
         
         // Shield state
         if (this.player.shieldActive) {
-            this.player.shieldTime--;
+            this.player.shieldTime -= speed;
             if (this.player.shieldTime <= 0) {
                 this.player.shieldActive = false;
             }
         }
         if (this.player.shieldCooldown > 0) {
-            this.player.shieldCooldown--;
+            this.player.shieldCooldown -= speed;
         }
         
         // Move starfield
         this.stars.forEach(s => {
-            s.y += s.speed;
+            s.y += s.speed * speed;
             if (s.y > this.canvas.height) {
                 s.y = 0;
                 s.x = Math.random() * this.canvas.width;
@@ -727,14 +736,16 @@ class SpaceDefender {
         
         // Move lasers
         this.lasers.forEach((l, idx) => {
-            l.y -= l.speed;
+            l.y -= l.speed * speed;
             if (l.y < 0) {
                 this.lasers.splice(idx, 1);
             }
         });
         
         // Spawn falling debris / enemies (Max 2 onscreen, 3.5x size)
-        if (this.invaders.length < 2 && (this.frameCount - this.lastSpawnFrame >= 90)) {
+        this.spawnTimer = (this.spawnTimer || 0) + speed;
+        if (this.invaders.length < 2 && this.spawnTimer >= 90) {
+            this.spawnTimer = 0;
             const size = (Math.random() * 18 + 14) * 3.5;
             this.invaders.push({
                 x: Math.random() * (this.canvas.width - size),
@@ -745,13 +756,12 @@ class SpaceDefender {
                 rot: Math.random() * Math.PI,
                 rotSpeed: (Math.random() - 0.5) * 0.06
             });
-            this.lastSpawnFrame = this.frameCount;
         }
         
         // Move invaders
         this.invaders.forEach((inv, invIdx) => {
-            inv.y += inv.speed;
-            inv.rot += inv.rotSpeed;
+            inv.y += inv.speed * speed;
+            inv.rot += inv.rotSpeed * speed;
             
             // Reached bottom
             if (inv.y > this.canvas.height) {
@@ -817,9 +827,9 @@ class SpaceDefender {
         
         // Particle fade
         this.particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
-            p.alpha -= 0.035;
+            p.x += p.vx * speed;
+            p.y += p.vy * speed;
+            p.alpha -= 0.035 * speed;
         });
         this.particles = this.particles.filter(p => p.alpha > 0);
     }
@@ -1063,9 +1073,11 @@ class SimonMemory {
     update() {
         if (!this.isPlaying) return;
         
+        const speed = window.gameSpeedMultiplier || 1.0;
+        
         if (this.state === 'showing') {
             if (this.showTimer > 0) {
-                this.showTimer--;
+                this.showTimer -= speed;
             }
             if (this.showTimer <= 0) {
                 if (this.activePanel !== null) {
@@ -1087,8 +1099,8 @@ class SimonMemory {
             }
         } else {
             if (this.showTimer > 0) {
-                this.showTimer--;
-                if (this.showTimer === 0) {
+                this.showTimer -= speed;
+                if (this.showTimer <= 0) {
                     this.activePanel = null;
                     if (this.state === 'success') {
                         this.nextRound();
@@ -1247,8 +1259,10 @@ class CyberHiLo {
     update() {
         if (!this.isPlaying) return;
         
+        const speed = window.gameSpeedMultiplier || 1.0;
+        
         if (this.state === 'revealing') {
-            this.revealTimer--;
+            this.revealTimer -= speed;
             if (this.revealTimer <= 0) {
                 if (this.lives <= 0) {
                     this.gameOver();
@@ -1467,6 +1481,11 @@ export function switchGame(gameName) {
     const ctx = uiElements.canvas.getContext('2d');
     ctx.clearRect(0, 0, uiElements.canvas.width, uiElements.canvas.height);
     
+    if (uiElements.lastCommandEl) {
+        uiElements.lastCommandEl.textContent = 'Waiting...';
+        uiElements.lastCommandEl.className = 'metric-value empty';
+    }
+    
     // Set title and details on overlay
     const titleEl = document.getElementById('overlay-title');
     const descEl = document.getElementById('overlay-instructions');
@@ -1530,6 +1549,11 @@ export function startGame() {
     uiElements.overlay.classList.remove('visible');
     uiElements.scoreEl.textContent = '0';
     
+    if (uiElements.lastCommandEl) {
+        uiElements.lastCommandEl.textContent = 'Waiting...';
+        uiElements.lastCommandEl.className = 'metric-value empty';
+    }
+    
     activeGame.start();
     
     // Start game tick
@@ -1566,6 +1590,18 @@ export function handleGameVoiceCommand(command) {
     // Display command visually
     if (uiElements.lastCommandEl) {
         uiElements.lastCommandEl.textContent = command;
+        
+        // Remove previous command styling classes
+        uiElements.lastCommandEl.classList.remove('cmd-yes', 'cmd-no', 'cmd-up', 'cmd-down', 'cmd-other', 'empty');
+        
+        // Add specific color class
+        const cmdLower = command.toLowerCase();
+        if (['yes', 'no', 'up', 'down', 'other'].includes(cmdLower)) {
+            uiElements.lastCommandEl.classList.add(`cmd-${cmdLower}`);
+        } else {
+            uiElements.lastCommandEl.classList.add('cmd-other');
+        }
+        
         uiElements.lastCommandEl.classList.add('highlight-flash');
         setTimeout(() => {
             uiElements.lastCommandEl.classList.remove('highlight-flash');
