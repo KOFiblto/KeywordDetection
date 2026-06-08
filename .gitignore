@@ -14,8 +14,6 @@ env/
 *.pt
 *.pth
 *.ckpt
-*.onnx
-*.onnx.data
 
 # Cache
 .cache/

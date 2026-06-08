@@ -6,6 +6,7 @@ let audioContext = null;
 let mediaStream = null;
 
 // UI Elements
+const micSelect = document.getElementById('mic-select');
 const modelSelect = document.getElementById('model-select');
 const customModelBtn = document.getElementById('custom-model-btn');
 const tabs = document.querySelectorAll('.sidebar-tab');
@@ -176,6 +177,17 @@ async function inferAudio(blob, resultElement, isLiveMode = false) {
             const keyword = data.keyword.toUpperCase();
             resultElement.textContent = `Detected: ${keyword}`;
             
+            // Remove previous classes
+            resultElement.classList.remove('detected-yes', 'detected-no', 'detected-up', 'detected-down', 'detected-other');
+            
+            // Add class for coloring + pulsating animation
+            const kwLower = keyword.toLowerCase();
+            if (['yes', 'no', 'up', 'down', 'other'].includes(kwLower)) {
+                resultElement.classList.add(`detected-${kwLower}`);
+            } else {
+                resultElement.classList.add('detected-other');
+            }
+            
             if (isLiveMode) {
                 drawHighlight(keyword);
                 // Send voice command to games
@@ -184,12 +196,87 @@ async function inferAudio(blob, resultElement, isLiveMode = false) {
         }
     } catch (e) {
         console.error("Inference failed", e);
-        if (!isLiveMode) resultElement.textContent = "Error";
+        if (!isLiveMode) {
+            resultElement.textContent = "Error";
+            resultElement.classList.remove('detected-yes', 'detected-no', 'detected-up', 'detected-down', 'detected-other');
+        }
+    }
+}
+
+async function populateMicSelect() {
+    if (!micSelect) return;
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioDevices = devices.filter(device => device.kind === 'audioinput');
+        
+        const currentVal = micSelect.value;
+        micSelect.innerHTML = '';
+        
+        if (audioDevices.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = 'default';
+            opt.textContent = 'No microphones found';
+            micSelect.appendChild(opt);
+            return;
+        }
+        
+        audioDevices.forEach(device => {
+            const opt = document.createElement('option');
+            opt.value = device.deviceId;
+            opt.textContent = device.label || `Microphone ${micSelect.length + 1}`;
+            micSelect.appendChild(opt);
+        });
+        
+        // Restore value if it still exists
+        if (audioDevices.some(d => d.deviceId === currentVal)) {
+            micSelect.value = currentVal;
+        }
+    } catch (e) {
+        console.error("Error enumerating devices:", e);
     }
 }
 
 // --- Init ---
 fetchModels();
+populateMicSelect();
+
+// Listen for device changes
+try {
+    navigator.mediaDevices.addEventListener('devicechange', populateMicSelect);
+} catch (e) {
+    console.warn("Failed to add devicechange listener", e);
+}
+
+if (micSelect) {
+    micSelect.addEventListener('change', async () => {
+        if (isLive) {
+            stopLive();
+            await startLive();
+        } else {
+            try {
+                await initAudio();
+            } catch (e) {
+                console.error("Failed to change microphone:", e);
+            }
+        }
+    });
+}
+
+// Game Speed Slider Setup
+const gameSpeedSlider = document.getElementById('game-speed-slider');
+const gameSpeedDisplay = document.getElementById('game-speed-display');
+
+window.gameSpeedMultiplier = 1.0;
+
+if (gameSpeedSlider) {
+    gameSpeedSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        window.gameSpeedMultiplier = val;
+        if (gameSpeedDisplay) {
+            gameSpeedDisplay.textContent = `${val.toFixed(1)}x`;
+        }
+    });
+}
 
 modelSelect.addEventListener('change', (e) => {
     setModel(e.target.value);
@@ -239,8 +326,29 @@ tabs.forEach(tab => {
 async function initAudio() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     }
+    
+    const selectedDeviceId = micSelect ? micSelect.value : 'default';
+    const constraints = {
+        audio: selectedDeviceId === 'default' ? true : { deviceId: { exact: selectedDeviceId } },
+        video: false
+    };
+    
+    // Stop previous track if any
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+    }
+    
+    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    
+    // Populate mic dropdown labels once permission is granted
+    if (micSelect && (micSelect.options.length <= 1 || micSelect.options[0].label === '')) {
+        await populateMicSelect();
+        if (selectedDeviceId !== 'default') {
+            micSelect.value = selectedDeviceId;
+        }
+    }
+    
     if (audioContext.state === 'suspended') {
         await audioContext.resume();
     }
@@ -302,6 +410,7 @@ recordBtnNormal.addEventListener('mousedown', async () => {
     
     recordBtnNormal.classList.add('recording');
     recordBtnNormal.textContent = 'Recording...';
+    resultNormal.className = 'result-display';
     resultNormal.textContent = 'Listening...';
     
     let stopped = false;
@@ -361,6 +470,7 @@ recordBtnNormal.addEventListener('touchstart', async (e) => {
     
     recordBtnNormal.classList.add('recording');
     recordBtnNormal.textContent = 'Recording...';
+    resultNormal.className = 'result-display';
     resultNormal.textContent = 'Listening...';
     
     let stopped = false;
@@ -406,11 +516,11 @@ const ctxSpec = spectrogramCanvas.getContext('2d', { willReadFrequently: true })
 const ctxDet = detectionsCanvas.getContext('2d');
 
 const KEYWORD_COLORS = {
-    'YES': '#ffffff',
-    'NO': '#888888',
-    'UP': '#aaaaaa',
-    'DOWN': '#666666',
-    'OTHER': '#444444'
+    'YES': '#97DCAE',
+    'NO': '#DC8D82',
+    'UP': '#8BB8D7',
+    'DOWN': '#8290BA',
+    'OTHER': '#F6E7B9'
 };
 
 let highlights = [];

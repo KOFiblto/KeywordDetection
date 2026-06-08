@@ -14,11 +14,11 @@
   --text-main: #ffffff;
   --text-muted: #888888;
   
-  --color-yes: #ffffff;     /* YES - White */
-  --color-no: #888888;      /* NO - Dark Gray */
-  --color-up: #aaaaaa;      /* UP - Medium Gray */
-  --color-down: #666666;    /* DOWN - Deep Gray */
-  --color-other: #444444;   /* OTHER - Charcoal */
+  --color-yes: #97DCAE;     /* YES - Mint Green */
+  --color-no: #DC8D82;      /* NO - Soft Coral */
+  --color-up: #8BB8D7;      /* UP - Soft Blue */
+  --color-down: #8290BA;    /* DOWN - Slate Blue */
+  --color-other: #F6E7B9;   /* OTHER - Pastel Yellow */
 }
 
 * {
@@ -541,6 +541,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .color-down { background-color: var(--color-down); }
 .color-other { background-color: var(--color-other); }
 
+.item-yes { color: var(--color-yes); }
+.item-no { color: var(--color-no); }
+.item-up { color: var(--color-up); }
+.item-down { color: var(--color-down); }
+.item-other { color: var(--color-other); }
+
 .visualizers {
   flex-grow: 1;
   display: flex;
@@ -917,3 +923,43 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-size: 1rem;
   font-weight: 400;
 }
+
+/* Detected Word Animations and Colors */
+@keyframes pulsate-yes {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-yes)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 15px var(--color-yes)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-yes)); }
+}
+@keyframes pulsate-no {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-no)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 15px var(--color-no)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-no)); }
+}
+@keyframes pulsate-up {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-up)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 15px var(--color-up)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-up)); }
+}
+@keyframes pulsate-down {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-down)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 15px var(--color-down)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-down)); }
+}
+@keyframes pulsate-other {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-other)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 15px var(--color-other)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--color-other)); }
+}
+
+.detected-yes { color: var(--color-yes) !important; text-shadow: 0 0 10px var(--color-yes) !important; animation: pulsate-yes 0.8s infinite alternate ease-in-out; }
+.detected-no { color: var(--color-no) !important; text-shadow: 0 0 10px var(--color-no) !important; animation: pulsate-no 0.8s infinite alternate ease-in-out; }
+.detected-up { color: var(--color-up) !important; text-shadow: 0 0 10px var(--color-up) !important; animation: pulsate-up 0.8s infinite alternate ease-in-out; }
+.detected-down { color: var(--color-down) !important; text-shadow: 0 0 10px var(--color-down) !important; animation: pulsate-down 0.8s infinite alternate ease-in-out; }
+.detected-other { color: var(--color-other) !important; text-shadow: 0 0 10px var(--color-other) !important; animation: pulsate-other 0.8s infinite alternate ease-in-out; }
+
+/* Voice Arcade Command Colors */
+.cmd-yes { color: var(--color-yes) !important; text-shadow: 0 0 8px var(--color-yes); }
+.cmd-no { color: var(--color-no) !important; text-shadow: 0 0 8px var(--color-no); }
+.cmd-up { color: var(--color-up) !important; text-shadow: 0 0 8px var(--color-up); }
+.cmd-down { color: var(--color-down) !important; text-shadow: 0 0 8px var(--color-down); }
+.cmd-other { color: var(--color-other) !important; text-shadow: 0 0 8px var(--color-other); }
