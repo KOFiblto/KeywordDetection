@@ -1,7 +1,9 @@
 import WaveSurfer from 'wavesurfer.js';
 import { initGames, switchGame, startGame, stopActiveGame, handleGameVoiceCommand } from './games.js';
 
-const BACKEND_URL = 'http://127.0.0.1:18000';
+const BACKEND_URL = window.location.port === '5173' || window.location.hostname.includes('lhr.life') || window.location.hostname.includes('localtunnel') || window.location.hostname.includes('localexpose')
+    ? `${window.location.protocol}//${window.location.host}/api`
+    : `http://${window.location.hostname || 'localhost'}:18000`;
 let audioContext = null;
 let mediaStream = null;
 
@@ -338,7 +340,35 @@ async function populateMicSelect() {
     }
 }
 
+function checkSecureContext() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const warning = document.createElement('div');
+        warning.className = 'secure-context-warning';
+        warning.innerHTML = `
+            <div class="warning-card">
+                <div class="warning-icon">⚠️</div>
+                <h3>Microphone Access Blocked</h3>
+                <p>Modern mobile browsers (iOS Safari, Android Chrome) block microphone access over local IP addresses on insecure HTTP.</p>
+                <p>To use your mobile phone's microphone, you must use a secure context. Here are your options:</p>
+                <ul>
+                    <li><strong>Option A (Android Chrome):</strong> Go to <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>, enable the flag, add <code>http://${window.location.hostname}:5173</code> to the list, and relaunch Chrome.</li>
+                    <li><strong>Option B (iOS & Android):</strong> Run a free secure tunnel on your computer using <code>npx localtunnel --port 5173</code> (or <code>ngrok http 5173</code>) to get a secure <code>https://...</code> link you can open on your phone.</li>
+                    <li><strong>Option C:</strong> Use the application on your computer via <code>http://localhost:5173</code> (which browsers always treat as secure).</li>
+                </ul>
+                <button class="warning-close-btn" id="warning-close-btn">Dismiss</button>
+            </div>
+        `;
+        document.body.appendChild(warning);
+        
+        const closeBtn = warning.querySelector('#warning-close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => warning.remove());
+        }
+    }
+}
+
 // --- Init ---
+checkSecureContext();
 fetchModels();
 populateMicSelect();
 
@@ -435,7 +465,9 @@ async function initAudio() {
     
     const selectedDeviceId = micSelect ? micSelect.value : 'default';
     const constraints = {
-        audio: selectedDeviceId === 'default' ? true : { deviceId: { exact: selectedDeviceId } },
+        audio: (selectedDeviceId === 'default' || !selectedDeviceId || selectedDeviceId === 'loading') 
+            ? true 
+            : { deviceId: { exact: selectedDeviceId } },
         video: false
     };
     
@@ -444,10 +476,19 @@ async function initAudio() {
         mediaStream.getTracks().forEach(track => track.stop());
     }
     
-    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+        if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
+            console.warn("Requested microphone constraints failed, falling back to default microphone", err);
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } else {
+            throw err;
+        }
+    }
     
     // Populate mic dropdown labels once permission is granted
-    if (micSelect && (micSelect.options.length <= 1 || micSelect.options[0].label === '')) {
+    if (micSelect && (micSelect.options.length <= 1 || (micSelect.options[0] && micSelect.options[0].label === ''))) {
         await populateMicSelect();
         if (selectedDeviceId !== 'default') {
             micSelect.value = selectedDeviceId;
@@ -1045,3 +1086,33 @@ if (recordBtnDual) {
         }
     });
 }
+
+// Mobile Sidebar Foldable Controls
+const sidebar = document.getElementById('app-sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebarClose = document.getElementById('sidebar-close');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+const sidebarTabs = document.querySelectorAll('.sidebar-tab');
+
+if (sidebarToggle && sidebar) {
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.add('open');
+        if (sidebarOverlay) sidebarOverlay.classList.add('visible');
+    });
+}
+
+const closeSidebar = () => {
+    if (sidebar) sidebar.classList.remove('open');
+    if (sidebarOverlay) sidebarOverlay.classList.remove('visible');
+};
+
+if (sidebarClose) {
+    sidebarClose.addEventListener('click', closeSidebar);
+}
+if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+}
+sidebarTabs.forEach(tab => {
+    tab.addEventListener('click', closeSidebar);
+});
+
