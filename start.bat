@@ -1,14 +1,20 @@
 @echo off
-echo Starting Keyword Detection Application...
+echo ===================================================
+echo   Auditory AI Launcher
+echo ===================================================
+echo.
+echo Your computer's local IP address(es):
+for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr "IPv4"') do (
+    set temp_ip=%%i
+    call echo   - %%temp_ip: =%%
+)
+echo.
 
-:: Start the Python backend in a new command window
-start "KeywordDetectionBackend" cmd /c "cd /d "%~dp0backend" && "..\.venv\Scripts\python.exe" main.py"
+:: Save original directory
+set "ORIG_DIR=%CD%"
 
-:: Wait a moment to ensure backend starts
-ping 127.0.0.1 -n 3 > nul
+:: Run the integrated services runner script
+node start-services.js
 
-:: Start the Electron frontend in a new command window
-start "KeywordDetectionFrontend" cmd /c "cd /d "%~dp0frontend" && npm start"
-
-echo Both services have been started in separate windows!
-echo You can use stop.bat to close them.
+:: Restore original directory
+cd /d "%ORIG_DIR%"
