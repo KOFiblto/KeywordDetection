@@ -1,0 +1,128 @@
+\section{Web Application Architecture and Deployment}
+
+This section describes the design and deployment of the companion web application, which serves as the interactive dashboard for the keyword detection model.
+
+\subsection{Desktop Application Integration (Electron)}
+The application runs as a desktop application using the Electron framework.
+* **Process Separation:** Electron separates the node main process (\texttt{main.cjs}) from the browser renderer process.
+* **Preload Bridge:** A preload script (\texttt{preload.cjs}) establishes a secure IPC (Inter-Process Communication) bridge, exposing a custom method to select files:
+  \begin{lstlisting}[language=JavaScript, caption={IPC File Browser Bridge}]
+  const { contextBridge, ipcRenderer } = require('electron');
+  contextBridge.exposeInMainWorld('electronAPI', {
+      openFile: () => ipcRenderer.invoke('dialog:openFile')
+  });
+  \end{lstlisting}
+* **Custom Models:** This enables the frontend to browse for a local \texttt{.onnx} model, append it to the dropdown menu, and request the backend to load it.
+
+\subsection{FastAPI Backend Server}
+The backend is built with FastAPI and runs on \texttt{http://127.0.0.1:18000}. It is configured to allow CORS requests from all origins to facilitate frontend communication.
+
+\subsubsection{API Contracts}
+* \textbf{\texttt{GET /models}}: Returns a JSON list of available models and the current active model.
+* \textbf{\texttt{POST /set\_model}}: Receives the selected model's path and reinstantiates the ONNX Runtime session.
+* \textbf{\texttt{POST /infer}}: Accepts a WAV file upload, processes it, runs inference, and returns the classification results:
+  \begin{lstlisting}[language=json, caption={Inference API Response Schema}]
+  {
+    "status": "success",
+    "keyword": "up",
+    "class_index": 2,
+    "classes": ["yes", "no", "up", "down", "other"]
+  }
+  \end{lstlisting}
+
+\subsubsection{Dynamic Model Loading and Transform Selection}
+To support both PyTorch and TensorFlow models, the backend inspects the input shape of the loaded ONNX file during initialization:
+* If the input layer features dimension is 64, the backend applies the \texttt{LogMelSpectrogram} transform.
+* If the features dimension is 40, it defaults to the \texttt{MFCC} transform.
+
+\subsection{Frontend Recording and Audio Capture}
+
+\subsubsection{Normal Mode (Manual Triggering)}
+In Normal Mode, the user clicks and holds the **Hold to Talk** button to record. A \texttt{ScriptProcessorNode} captures audio samples from the microphone. When the user releases the button, the samples are converted to a WAV blob and sent to the backend. The recording automatically stops after **1.0 second** to keep inputs consistent with model training.
+
+\subsubsection{Live Mode (Continuous Streaming)}
+Live Mode captures audio continuously from the selected microphone device and stores it in a circular float32 buffer of size $16,000$ (1 second of audio at $16\text{ kHz}$):
+\begin{equation}
+    x_{\text{circular}}[(i_{\text{buffer}} + j) \pmod{16000}] = x_{\text{input}}[j]
+\end{equation}
+
+A sliding window inference is run at a configurable interval (typically every $200\text{ ms}$). Every interval, the last 1 second of samples is read from the circular buffer, converted to a WAV blob, and sent to the backend. This overlapping sliding window approach reduces detection latency.
+
+\subsubsection{Dynamic Microphone Input Selection and Hot-Plugging}
+To select and switch audio input sources, the application manages device handles:
+\begin{itemize}
+    \item \textbf{Device Enumeration:} The frontend queries input hardware via \texttt{navigator.mediaDevices.enumerateDevices()} to populate the microphone selector dropdown menu.
+    \item \textbf{Hot-Plugging Support:} A listener is registered for the \texttt{devicechange} event, which automatically updates the input listing at runtime if a new device is plugged or unplugged.
+    \item \textbf{Hardware Resource Cleanup:} When switching devices, the active \texttt{MediaStreamTrack} is stopped to free up the system's microphone resources, before re-initiating audio capture with the new constraints.
+\end{itemize}
+
+
+\subsection{Real-Time Visualizations}
+Live Mode features three HTML5 Canvas visualization displays rendered at 60 FPS using \texttt{requestAnimationFrame}:
+
+\begin{enumerate}
+    \item \textbf{Oscilloscope Waveform Canvas:}
+    Displays time-domain audio data captured via an \texttt{AnalyserNode} (\texttt{getByteTimeDomainData}). The waveform scrolls horizontally from right to left in real-time.
+    \item \textbf{Scrolling Spectrogram Canvas:}
+    Displays frequency-domain data using \texttt{getByteFrequencyData}. Frequency magnitudes are mapped to grayscale values, creating a scrolling spectrogram that represents pitch and intensity over time.
+    \item \textbf{Detections Timeline Canvas:}
+    Displays a scrolling timeline of model predictions. When the backend detects a keyword, a colored block corresponding to the classification is added to the timeline, scrolling left in sync with the waveform and spectrogram.
+\end{enumerate}
+
+\subsection{Voice Arcade Games}
+The **Voice Arcade** contains five HTML5 Canvas games designed to be controlled using voice commands.
+
+\begin{enumerate}
+    \item \textbf{Flappy Bird:}
+    Saying \texttt{UP} applies upward velocity to jump. The pipe speed can be adjusted using a speed slider.
+    \item \textbf{Grid Runner:}
+    Saying \texttt{UP}, \texttt{DOWN}, \texttt{YES} (Right), or \texttt{NO} (Left) navigates the player on a 15x10 grid to collect green gems and avoid red enemies.
+    \item \textbf{Space Defender:}
+    Saying \texttt{YES} (Move Right) or \texttt{NO} (Move Left) moves the ship, \texttt{UP} fires a laser, and \texttt{DOWN} activates a shield for 1.6 seconds.
+    \item \textbf{Simon Memory (Turn-based):}
+    The game displays a sequence of directions, and the player must repeat it back using voice commands.
+    \item \textbf{Cyber Hi-Lo (Turn-based):}
+    A card-guessing game. The player guesses if the next card will be higher (\texttt{UP}) or lower (\texttt{DOWN}).
+\end{enumerate}
+
+\subsubsection{Latency Adaptations}
+To accommodate model inference latency, two controls are included:
+* \textbf{Inference Window Interval Slider:} Controls how frequently the sliding window sends data to the backend (from $100\text{ ms}$ to $1000\text{ ms}$).
+* \textbf{Game Speed Slider:} Modifies the tick rates, gravity forces, and translation values in \texttt{games.js} via a speed multiplier (\texttt{window.gameSpeedMultiplier}) to adjust game speed based on vocal response times.
+
+\subsubsection{Real-Time Retro Audio Sound Effects Synthesizer}
+To play retro sound effects without loading heavy audio assets (like static MP3 or WAV files), a lightweight audio synthesizer is implemented directly inside \texttt{games.js} utilizing the Web Audio API:
+\begin{itemize}
+    \item \textbf{Sound Synthesis Engine:} A centralized \texttt{playSound(type)} function instantiates a shared \texttt{AudioContext} and schedules oscillator frequency sweeps on-the-fly.
+    \item \textbf{Synthesized Sound Profiles:}
+    \begin{itemize}
+        \item \textit{Flap (Flappy Bird Jump):} A sine wave oscillator executing an exponential frequency ramp from 150 Hz to 380 Hz over 0.1 seconds, combined with a quick volume decay envelope.
+        \item \textit{Score (Gem Collected/Pipe Passed):} A dual-note arpeggio (C5 at 523.25 Hz followed by E5 at 659.25 Hz) using a triangle wave oscillator over 0.22 seconds.
+        \item \textit{Hit (Game Over/Crash):} A descending sawtooth wave frequency ramp from 120 Hz to 30 Hz over 0.35 seconds, mimicking an explosion or impact sound.
+        \item \textit{Laser (Space Defender Shooting):} A rapid descending sawtooth sweep from 700 Hz to 150 Hz over 0.12 seconds.
+        \item \textit{Shield (Space Defender Shield Activate):} A sine wave oscillator modulated from 250 Hz to 320 Hz and back to 250 Hz over 0.3 seconds.
+        \item \textit{Shield Blocked (Debris hitting shield):} A harsh square wave oscillator switching from 280 Hz to 220 Hz over 0.15 seconds.
+    \end{itemize}
+\end{itemize}
+
+
+\subsection{Startup and Shutdown Utilities}
+
+\subsubsection{Application Startup (\texttt{start.bat})}
+Launches the application services:
+1. **Inference Server:** Starts FastAPI in a command window titled \texttt{KeywordDetectionBackend} using the virtual environment interpreter.
+2. **Launch Delay:** Pauses for 3 seconds using a loopback ping to allow the FastAPI server to initialize and load the model:
+   \begin{lstlisting}[language=bash]
+   ping 127.0.0.1 -n 3 > nul
+   \end{lstlisting}
+3. **Frontend Host:** Launches Electron in a command window titled \texttt{KeywordDetectionFrontend}.
+
+\subsubsection{Application Shutdown (\texttt{stop.bat})}
+Gracefully terminates services:
+1. **Targeted Terminations:** Finds and terminates windows titled \texttt{KeywordDetectionBackend*} and \texttt{KeywordDetectionFrontend*}.
+2. **Failsafe Port Clearance:** Queries for processes listening on port 18000 and terminates them by PID to prevent port lockouts:
+   \begin{lstlisting}[language=bash]
+   for /f "tokens=5" %%a in ('netstat -aon ^| findstr :18000') do (
+       taskkill /F /PID %%a > nul 2>&1
+   )
+   \end{lstlisting}
