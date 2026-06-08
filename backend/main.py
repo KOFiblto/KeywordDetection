@@ -63,12 +63,14 @@ class LogMelSpectrogram(nn.Module):
         return torch.log(x + 1e-6)
 
 # State
-current_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "PyTorch", "Models", "PyTorch.onnx"))
-current_model_type = "onnx"
-ort_session = None
+# Cache for loaded models: {path: {"session": session, "transform": transform}}
+model_cache = {}
 
-def load_model(path: str):
-    global current_model_path, current_model_type, ort_session, mfcc_transform
+def get_or_load_model(path: str):
+    path = os.path.abspath(path)
+    if path in model_cache:
+        return model_cache[path]["session"], model_cache[path]["transform"]
+        
     if not os.path.exists(path):
         raise FileNotFoundError(f"Model file not found: {path}")
     
@@ -81,29 +83,53 @@ def load_model(path: str):
         
         # Check expected input shape to dynamically identify version
         input_shape = session.get_inputs()[0].shape
-        # input_shape[2] represents features dim (64 for v2, 40 for v1)
-        if len(input_shape) > 2 and (input_shape[2] == 64 or 'PyTorch2' in path):
+        
+        # Determine features dimension based on channel layout
+        # PyTorch format: [batch, channel, features, time] -> features is at index 2
+        # TensorFlow format: [batch, features, time, channel] -> features is at index 1
+        features_dim = 40
+        if len(input_shape) == 4:
+            if input_shape[3] == 1 or input_shape[3] == '1':
+                features_dim = input_shape[1]
+            else:
+                features_dim = input_shape[2]
+        elif len(input_shape) == 3:
+            features_dim = input_shape[1]
+
+        if features_dim == 64 or 'PyTorch2' in path or 'PyTorch3' in path:
             is_v2 = True
-            
-        ort_session = session
-        current_model_type = "onnx"
     else:
         raise ValueError("Unsupported model extension. Only self-sustaining .onnx models are supported.")
         
     # Instantiate and select correct transform
     if is_v2:
-        mfcc_transform = LogMelSpectrogram(
+        transform = LogMelSpectrogram(
             sample_rate=TARGET_SAMPLE_RATE, n_fft=400, hop_length=160, n_mels=64
         ).to(DEVICE)
-        print("Using LogMelSpectrogram (v2) transform.")
+        print(f"Using LogMelSpectrogram (v2) transform for {path}.")
     else:
-        mfcc_transform = torchaudio.transforms.MFCC(
+        transform = torchaudio.transforms.MFCC(
             sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
         ).to(DEVICE)
-        print("Using MFCC (v1) transform.")
+        print(f"Using MFCC (v1) transform for {path}.")
         
+    model_cache[path] = {"session": session, "transform": transform}
+    return session, transform
+
+# State
+current_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "PyTorch", "Models", "PyTorch.onnx"))
+current_model_type = "onnx"
+ort_session = None
+
+def load_model(path: str):
+    global current_model_path, current_model_type, ort_session, mfcc_transform
+    path = os.path.abspath(path)
+    session, transform = get_or_load_model(path)
+    ort_session = session
+    mfcc_transform = transform
     current_model_path = path
-    print(f"Loaded model: {path}")
+    current_model_type = "onnx"
+    print(f"Loaded active model: {path}")
 
 # Initial load
 try:
@@ -150,13 +176,17 @@ def get_models():
     return {"available_models": existing, "current_model": current_model_path}
 
 @app.post("/infer")
-async def infer(audio: UploadFile = File(...)):
-    if not ort_session:
-        raise HTTPException(status_code=500, detail="No model loaded")
-
+async def infer(audio: UploadFile = File(...), model_path: str = Form(None)):
     audio_bytes = await audio.read()
     
     try:
+        if model_path:
+            session, transform = get_or_load_model(model_path)
+        else:
+            if not ort_session:
+                raise HTTPException(status_code=500, detail="No model loaded")
+            session, transform = ort_session, mfcc_transform
+
         waveform_np, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
         waveform = torch.from_numpy(waveform_np)
         
@@ -185,14 +215,30 @@ async def infer(audio: UploadFile = File(...)):
         # Add batch dim -> [1, 1, 16000]
         waveform = waveform.unsqueeze(0).to(DEVICE)
         
-        # Compute MFCC -> [1, 1, 40, 81]
+        # Compute MFCC -> [1, 1, 40, 81] or [1, 1, 64, 101]
         with torch.no_grad():
-            mfcc = mfcc_transform(waveform)
+            mfcc = transform(waveform)
 
         # Run ONNX inference
         mfcc_np = mfcc.cpu().numpy()
-        ort_inputs = {ort_session.get_inputs()[0].name: mfcc_np}
-        logits = ort_session.run(None, ort_inputs)[0]
+        
+        # Check expected input shape from ONNX model
+        input_details = session.get_inputs()[0]
+        expected_shape = input_details.shape
+        
+        # Adjust mfcc_np shape to match expected_shape dimensions dynamically
+        # Normally mfcc_np is [batch, channel, height, width] e.g. [1, 1, 40, 81] or [1, 1, 64, 101]
+        if len(expected_shape) == 4:
+            # If the last dimension is 1 or '1' (representing channel-last format like TensorFlow [batch, height, width, channels])
+            if expected_shape[3] == 1 or expected_shape[3] == '1':
+                # Transpose from [batch, channel, height, width] to [batch, height, width, channel]
+                mfcc_np = mfcc_np.transpose(0, 2, 3, 1)
+        elif len(expected_shape) == 3:
+            # Squeeze channel dimension if model expects 3D input [batch, height, width]
+            mfcc_np = mfcc_np.squeeze(1)
+
+        ort_inputs = {input_details.name: mfcc_np}
+        logits = session.run(None, ort_inputs)[0]
         predicted_idx = np.argmax(logits, axis=1)[0]
 
         return {

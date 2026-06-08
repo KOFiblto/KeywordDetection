@@ -40,6 +40,36 @@ let currentInterval = 200;
 let lastInferenceTime = 0;
 let scrollAccumulator = 0;
 
+// Dual Mode UI Elements & Canvases
+const recordBtnDual = document.getElementById('record-btn-dual');
+const resultDualA = document.getElementById('result-dual-a');
+const resultDualB = document.getElementById('result-dual-b');
+const intervalSliderDual = document.getElementById('interval-slider-dual');
+const intervalDisplayDual = document.getElementById('interval-display-dual');
+const modelSelectA = document.getElementById('model-select-a');
+const modelSelectB = document.getElementById('model-select-b');
+
+const detectionsCanvasA = document.createElement('canvas');
+const detectionsCanvasB = document.createElement('canvas');
+const waveformCanvasDual = document.createElement('canvas');
+
+const detectionsContainerA = document.getElementById('detections-dual-a');
+const detectionsContainerB = document.getElementById('detections-dual-b');
+const waveformContainerDual = document.getElementById('waveform-dual');
+
+if (detectionsContainerA) detectionsContainerA.appendChild(detectionsCanvasA);
+if (detectionsContainerB) detectionsContainerB.appendChild(detectionsCanvasB);
+if (waveformContainerDual) waveformContainerDual.appendChild(waveformCanvasDual);
+
+let isDualLive = false;
+let dualLiveTimeout = null;
+let currentIntervalDual = 200;
+let lastInferenceTimeDual = 0;
+let scrollAccumulatorDual = 0;
+let animationIdDual = null;
+let highlightsA = [];
+let highlightsB = [];
+
 const gameIntervalSlider = document.getElementById('game-interval-slider');
 const gameIntervalDisplay = document.getElementById('game-interval-display');
 
@@ -59,6 +89,15 @@ if (intervalSlider) {
 if (gameIntervalSlider) {
     gameIntervalSlider.addEventListener('input', (e) => {
         updateInterval(parseInt(e.target.value, 10));
+    });
+}
+if (intervalSliderDual) {
+    intervalSliderDual.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value, 10);
+        currentIntervalDual = val;
+        if (intervalDisplayDual) {
+            intervalDisplayDual.textContent = `${val}ms`;
+        }
     });
 }
 let scriptProcessor = null;
@@ -94,6 +133,38 @@ function resizeCanvases() {
             detectionsCanvas.height = dh;
         }
     }
+    
+    // Dual mode canvases
+    const wElDual = document.getElementById('waveform-dual');
+    const dElA = document.getElementById('detections-dual-a');
+    const dElB = document.getElementById('detections-dual-b');
+    
+    if (wElDual) {
+        const w = wElDual.clientWidth;
+        const h = wElDual.clientHeight;
+        if (w > 0 && h > 0) {
+            waveformCanvasDual.width = w;
+            waveformCanvasDual.height = h;
+        }
+    }
+    
+    if (dElA) {
+        const dw = dElA.clientWidth;
+        const dh = dElA.clientHeight;
+        if (dw > 0 && dh > 0) {
+            detectionsCanvasA.width = dw;
+            detectionsCanvasA.height = dh;
+        }
+    }
+    
+    if (dElB) {
+        const dw = dElB.clientWidth;
+        const dh = dElB.clientHeight;
+        if (dw > 0 && dh > 0) {
+            detectionsCanvasB.width = dw;
+            detectionsCanvasB.height = dh;
+        }
+    }
 }
 window.addEventListener('resize', resizeCanvases);
 resizeCanvases();
@@ -122,6 +193,32 @@ async function fetchModels() {
             if (model === data.current_model) opt.selected = true;
             modelSelect.appendChild(opt);
         });
+        
+        // Populate Dual Model Selects
+        if (modelSelectA && modelSelectB) {
+            modelSelectA.innerHTML = '';
+            modelSelectB.innerHTML = '';
+            data.available_models.forEach((model, index) => {
+                const optA = document.createElement('option');
+                optA.value = model;
+                optA.textContent = model.split(/[\\/]/).pop();
+                
+                const optB = document.createElement('option');
+                optB.value = model;
+                optB.textContent = model.split(/[\\/]/).pop();
+                
+                // Select different defaults if possible to compare immediately
+                if (index === 0) {
+                    optA.selected = true;
+                } else if (index === 1 || (data.available_models.length === 1 && index === 0)) {
+                    optB.selected = true;
+                }
+                
+                modelSelectA.appendChild(optA);
+                modelSelectB.appendChild(optB);
+            });
+            updateDualLabels();
+        }
         
         if (badge) {
             badge.textContent = 'Online';
@@ -163,9 +260,12 @@ async function setModel(path) {
     }
 }
 
-async function inferAudio(blob, resultElement, isLiveMode = false) {
+async function inferAudio(blob, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
     const formData = new FormData();
     formData.append('audio', blob, 'audio.wav');
+    if (modelPath) {
+        formData.append('model_path', modelPath);
+    }
     
     try {
         const res = await fetch(`${BACKEND_URL}/infer`, {
@@ -188,7 +288,9 @@ async function inferAudio(blob, resultElement, isLiveMode = false) {
                 resultElement.classList.add('detected-other');
             }
             
-            if (isLiveMode) {
+            if (highlightCallback) {
+                highlightCallback(keyword);
+            } else if (isLiveMode) {
                 drawHighlight(keyword);
                 // Send voice command to games
                 handleGameVoiceCommand(keyword);
@@ -310,9 +412,12 @@ tabs.forEach(tab => {
         // Timeout to let DOM redraw and clientWidth be valid
         setTimeout(resizeCanvases, 50);
         
-        // Stop live stream if going to manual Normal Mode
-        if (tab.dataset.target === 'normal-mode' && isLive) {
+        // Stop live streams if switching away from their modes
+        if (tab.dataset.target !== 'live-mode' && isLive) {
             stopLive();
+        }
+        if (tab.dataset.target !== 'dual-mode' && isDualLive) {
+            stopDualLive();
         }
         
         // Stop active game if switching away from Voice Arcade
@@ -743,4 +848,200 @@ if (gameCanvas) {
             }
         });
     }
+}
+
+// --- Dual Model Live Drawing and Inference ---
+const ctxDetA = detectionsCanvasA.getContext('2d');
+const ctxDetB = detectionsCanvasB.getContext('2d');
+const ctxWaveDual = waveformCanvasDual.getContext('2d', { willReadFrequently: true });
+
+function updateDualLabels() {
+    const labelResultA = document.getElementById('label-result-a');
+    const labelResultB = document.getElementById('label-result-b');
+    const legendLabelA = document.getElementById('legend-label-a');
+    const legendLabelB = document.getElementById('legend-label-b');
+    
+    if (modelSelectA && modelSelectA.selectedOptions.length > 0) {
+        const nameA = modelSelectA.selectedOptions[0].textContent;
+        if (labelResultA) labelResultA.textContent = `${nameA} Detection`;
+        if (legendLabelA) legendLabelA.textContent = `${nameA} Timeline (15s)`;
+    }
+    if (modelSelectB && modelSelectB.selectedOptions.length > 0) {
+        const nameB = modelSelectB.selectedOptions[0].textContent;
+        if (labelResultB) labelResultB.textContent = `${nameB} Detection`;
+        if (legendLabelB) legendLabelB.textContent = `${nameB} Timeline (15s)`;
+    }
+}
+
+if (modelSelectA) modelSelectA.addEventListener('change', updateDualLabels);
+if (modelSelectB) modelSelectB.addEventListener('change', updateDualLabels);
+
+function drawHighlightDual(modelType, keyword) {
+    if (!lastInferenceTimeDual) return;
+    const now = Date.now();
+    const actualDelta = now - lastInferenceTimeDual;
+    const pixelsPerMs = detectionsCanvasA.width / 15000;
+    const blockWidth = (actualDelta * pixelsPerMs) - 1;
+    
+    if (modelType === 'A') {
+        highlightsA.push({ x: detectionsCanvasA.width, keyword: keyword, width: Math.max(1, blockWidth) });
+    } else {
+        highlightsB.push({ x: detectionsCanvasB.width, keyword: keyword, width: Math.max(1, blockWidth) });
+    }
+}
+
+function renderDualVisuals() {
+    if (!analyser) return;
+    
+    const pixelsPerFrame = waveformCanvasDual.width / (15000 / (1000 / 60));
+    scrollAccumulatorDual += pixelsPerFrame;
+    const speed = Math.floor(scrollAccumulatorDual);
+    
+    if (speed >= 1) {
+        scrollAccumulatorDual -= speed;
+        
+        // Waveform
+        const wData = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteTimeDomainData(wData);
+        
+        const wImg = ctxWaveDual.getImageData(speed, 0, waveformCanvasDual.width - speed, waveformCanvasDual.height);
+        ctxWaveDual.putImageData(wImg, 0, 0);
+        ctxWaveDual.clearRect(waveformCanvasDual.width - speed, 0, speed, waveformCanvasDual.height);
+        
+        ctxWaveDual.beginPath();
+        ctxWaveDual.strokeStyle = '#ffffff';
+        ctxWaveDual.lineWidth = 2;
+        for (let i = 0; i < wData.length; i++) {
+            const v = wData[i] / 128.0;
+            const y = (v * waveformCanvasDual.height) / 2;
+            const x = waveformCanvasDual.width - speed + (i / wData.length) * speed;
+            if (i === 0) ctxWaveDual.moveTo(x, y);
+            else ctxWaveDual.lineTo(x, y);
+        }
+        ctxWaveDual.stroke();
+        
+        // Detections A
+        ctxDetA.clearRect(0, 0, detectionsCanvasA.width, detectionsCanvasA.height);
+        highlightsA.forEach((h) => {
+            h.x -= speed;
+            const color = KEYWORD_COLORS[h.keyword] || KEYWORD_COLORS['OTHER'];
+            ctxDetA.fillStyle = color;
+            ctxDetA.fillRect(h.x - h.width, 0, h.width, detectionsCanvasA.height);
+        });
+        highlightsA = highlightsA.filter(h => h.x > 0);
+
+        // Detections B
+        ctxDetB.clearRect(0, 0, detectionsCanvasB.width, detectionsCanvasB.height);
+        highlightsB.forEach((h) => {
+            h.x -= speed;
+            const color = KEYWORD_COLORS[h.keyword] || KEYWORD_COLORS['OTHER'];
+            ctxDetB.fillStyle = color;
+            ctxDetB.fillRect(h.x - h.width, 0, h.width, detectionsCanvasB.height);
+        });
+        highlightsB = highlightsB.filter(h => h.x > 0);
+    }
+
+    if (isDualLive) {
+        animationIdDual = requestAnimationFrame(renderDualVisuals);
+    }
+}
+
+function syncDualLiveUI() {
+    if (isDualLive) {
+        recordBtnDual.textContent = 'Stop Dual Stream';
+        recordBtnDual.classList.add('danger');
+        resultDualA.textContent = 'Listening...';
+        resultDualA.className = 'result-display-live';
+        resultDualB.textContent = 'Listening...';
+        resultDualB.className = 'result-display-live';
+    } else {
+        recordBtnDual.textContent = 'Start Dual Stream';
+        recordBtnDual.classList.remove('danger');
+        resultDualA.textContent = 'Ready';
+        resultDualA.className = 'result-display-live';
+        resultDualB.textContent = 'Ready';
+        resultDualB.className = 'result-display-live';
+    }
+}
+
+async function startDualLive() {
+    await initAudio();
+    isDualLive = true;
+    syncDualLiveUI();
+    
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    
+    scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+    scriptProcessor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        for (let i = 0; i < input.length; i++) {
+            circularBuffer[bufferIndex] = input[i];
+            bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
+        }
+    };
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(audioContext.destination);
+    
+    // Clear canvases
+    ctxWaveDual.clearRect(0, 0, waveformCanvasDual.width, waveformCanvasDual.height);
+    ctxDetA.clearRect(0, 0, detectionsCanvasA.width, detectionsCanvasA.height);
+    ctxDetB.clearRect(0, 0, detectionsCanvasB.width, detectionsCanvasB.height);
+    highlightsA = [];
+    highlightsB = [];
+    lastInferenceTimeDual = Date.now();
+    scrollAccumulatorDual = 0;
+    
+    renderDualVisuals();
+    
+    function scheduleNextInferenceDual() {
+        if (!isDualLive) return;
+        dualLiveTimeout = setTimeout(() => {
+            let samples = new Float32Array(BUFFER_SIZE);
+            for (let i = 0; i < BUFFER_SIZE; i++) {
+                samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
+            }
+            
+            const wavBlob = float32ToWav(samples, SAMPLE_RATE);
+            const modelA = modelSelectA ? modelSelectA.value : '';
+            const modelB = modelSelectB ? modelSelectB.value : '';
+            
+            Promise.all([
+                inferAudio(wavBlob, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
+                inferAudio(wavBlob, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
+            ]).then(() => {
+                lastInferenceTimeDual = Date.now();
+                scheduleNextInferenceDual();
+            }).catch(() => {
+                lastInferenceTimeDual = Date.now();
+                scheduleNextInferenceDual();
+            });
+        }, currentIntervalDual);
+    }
+    
+    scheduleNextInferenceDual();
+}
+
+function stopDualLive() {
+    isDualLive = false;
+    if (dualLiveTimeout) clearTimeout(dualLiveTimeout);
+    if (animationIdDual) cancelAnimationFrame(animationIdDual);
+    if (scriptProcessor) {
+        scriptProcessor.disconnect();
+        scriptProcessor = null;
+    }
+    syncDualLiveUI();
+}
+
+if (recordBtnDual) {
+    recordBtnDual.addEventListener('click', () => {
+        if (isDualLive) {
+            stopDualLive();
+        } else {
+            startDualLive();
+        }
+    });
 }
