@@ -45,58 +45,63 @@ mfcc_transform = torchaudio.transforms.MFCC(
     sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
 ).to(DEVICE)
 
-# Model definition for .pth
-class KeywordCNN(nn.Module):
-    def __init__(self, num_classes):
-        super(KeywordCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.conv4 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.dropout = nn.Dropout(0.3)
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))
-        self.fc1 = nn.Linear(128 * 4 * 4, 128)
-        self.fc2 = nn.Linear(128, num_classes)
+# Models are loaded and run using ONNX Runtime directly.
+
+# Log-Mel Spectrogram for PyTorch2 models
+class LogMelSpectrogram(nn.Module):
+    def __init__(self, sample_rate, n_fft=400, hop_length=160, n_mels=64):
+        super().__init__()
+        self.mel = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            n_mels=n_mels
+        )
 
     def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = self.pool(F.relu(self.conv4(x)))
-        x = self.adaptive_pool(x)
-        x = torch.flatten(x, 1)
-        x = self.dropout(F.relu(self.fc1(x)))
-        logits = self.fc2(x)
-        return logits
+        x = self.mel(x)
+        return torch.log(x + 1e-6)
 
 # State
 current_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "PyTorch", "Models", "PyTorch.onnx"))
-current_model_type = "onnx" # "onnx" or "pth"
-torch_model = None
+current_model_type = "onnx"
 ort_session = None
 
 def load_model(path: str):
-    global current_model_path, current_model_type, torch_model, ort_session
+    global current_model_path, current_model_type, ort_session, mfcc_transform
     if not os.path.exists(path):
         raise FileNotFoundError(f"Model file not found: {path}")
     
-    if path.endswith(".pth"):
-        model = KeywordCNN(num_classes=len(CLASSES)).to(DEVICE)
-        model.load_state_dict(torch.load(path, map_location=DEVICE, weights_only=True))
-        model.eval()
-        torch_model = model
-        ort_session = None
-        current_model_type = "pth"
-    elif path.endswith(".onnx"):
+    is_v2 = False
+    
+    if path.endswith(".onnx"):
         # providers options, use CUDA if available
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if torch.cuda.is_available() else ['CPUExecutionProvider']
-        ort_session = ort.InferenceSession(path, providers=providers)
-        torch_model = None
+        session = ort.InferenceSession(path, providers=providers)
+        
+        # Check expected input shape to dynamically identify version
+        input_shape = session.get_inputs()[0].shape
+        # input_shape[2] represents features dim (64 for v2, 40 for v1)
+        if len(input_shape) > 2 and (input_shape[2] == 64 or 'PyTorch2' in path):
+            is_v2 = True
+            
+        ort_session = session
         current_model_type = "onnx"
     else:
-        raise ValueError("Unsupported model extension. Use .pth or .onnx")
-    
+        raise ValueError("Unsupported model extension. Only self-sustaining .onnx models are supported.")
+        
+    # Instantiate and select correct transform
+    if is_v2:
+        mfcc_transform = LogMelSpectrogram(
+            sample_rate=TARGET_SAMPLE_RATE, n_fft=400, hop_length=160, n_mels=64
+        ).to(DEVICE)
+        print("Using LogMelSpectrogram (v2) transform.")
+    else:
+        mfcc_transform = torchaudio.transforms.MFCC(
+            sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
+        ).to(DEVICE)
+        print("Using MFCC (v1) transform.")
+        
     current_model_path = path
     print(f"Loaded model: {path}")
 
@@ -120,18 +125,33 @@ def set_model(req: SetModelRequest):
 @app.get("/models")
 def get_models():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    models = [
-        os.path.join(base_dir, "PyTorch", "Models", "PyTorch.onnx"),
-        os.path.join(base_dir, "PyTorch", "Models", "PyTorch.pth"),
-        os.path.join(base_dir, "Tensorflow", "Models", "Tensorflow.onnx")
-    ]
+    pytorch_models_dir = os.path.join(base_dir, "PyTorch", "Models")
+    tensorflow_models_dir = os.path.join(base_dir, "Tensorflow", "Models")
+    
+    models = []
+    
+    # scan PyTorch/Models
+    if os.path.exists(pytorch_models_dir):
+        for f in os.listdir(pytorch_models_dir):
+            if f.endswith(".onnx"):
+                models.append(os.path.join(pytorch_models_dir, f))
+                
+    # scan Tensorflow/Models
+    if os.path.exists(tensorflow_models_dir):
+        for f in os.listdir(tensorflow_models_dir):
+            if f.endswith(".onnx"):
+                models.append(os.path.join(tensorflow_models_dir, f))
+                
+    # sort models to make order consistent/clean
+    models.sort(key=lambda x: os.path.basename(x))
+    
     # filter out non-existent
     existing = [m for m in models if os.path.exists(m)]
     return {"available_models": existing, "current_model": current_model_path}
 
 @app.post("/infer")
 async def infer(audio: UploadFile = File(...)):
-    if not (torch_model or ort_session):
+    if not ort_session:
         raise HTTPException(status_code=500, detail="No model loaded")
 
     audio_bytes = await audio.read()
@@ -169,18 +189,11 @@ async def infer(audio: UploadFile = File(...)):
         with torch.no_grad():
             mfcc = mfcc_transform(waveform)
 
-        if current_model_type == "pth":
-            with torch.no_grad():
-                logits = torch_model(mfcc)
-                _, predicted = logits.max(1)
-                predicted_idx = predicted.item()
-        else:
-            mfcc_np = mfcc.cpu().numpy()
-            ort_inputs = {ort_session.get_inputs()[0].name: mfcc_np}
-            print("Expected:", ort_session.get_inputs()[0].shape)
-            print("Got:", mfcc_np.shape)
-            logits = ort_session.run(None, ort_inputs)[0]
-            predicted_idx = np.argmax(logits, axis=1)[0]
+        # Run ONNX inference
+        mfcc_np = mfcc.cpu().numpy()
+        ort_inputs = {ort_session.get_inputs()[0].name: mfcc_np}
+        logits = ort_session.run(None, ort_inputs)[0]
+        predicted_idx = np.argmax(logits, axis=1)[0]
 
         return {
             "status": "success",

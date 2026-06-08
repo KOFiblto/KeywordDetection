@@ -1,0 +1,156 @@
+\section{TensorFlow Model Implementation}
+
+This section describes the TensorFlow/Keras implementation of the keyword detection model, which was collaborated on by the secondary project developer. This model differs primarily from the PyTorch model by integrating a custom Mel-Spectrogram layer directly into the neural network graph, allowing it to process raw audio waveforms on the GPU.
+
+\subsection{Dataset Pipeline and Preprocessing}
+The TensorFlow pipeline uses native TensorFlow operations (\texttt{tf.data} and \texttt{tf.io}) to load and decode audio files. 
+
+\begin{lstlisting}[language=Python, caption={Native TensorFlow WAV Decoding and Alignment}, label={lst:tf_process_path}]
+@tf.function
+def process_path(file_path, label):
+    # Read and decode raw WAV binary
+    audio_binary = tf.io.read_file(file_path)
+    audio, _ = tf.audio.decode_wav(audio_binary, desired_channels=1)
+    audio = tf.squeeze(audio, axis=-1)
+
+    # Pad or crop to exactly 16000 samples (1 second)
+    audio_length = tf.shape(audio)[0]
+    padding = tf.maximum(NUM_SAMPLES - audio_length, 0)
+    audio = tf.pad(audio, [[0, padding]])
+    audio = audio[:NUM_SAMPLES]
+
+    return audio, label
+\end{lstlisting}
+
+\subsubsection{Dataset Splits}
+Unlike the PyTorch model's oversampling and downsampling balancing steps, the TensorFlow pipeline uses a standard stratified 3-way split of the raw dataset:
+\begin{itemize}
+    \item \textbf{Training Set:} 70\% of the files.
+    \item \textbf{Validation Set:} 10\% of the files.
+    \item \textbf{Test Set:} 20\% of the files.
+\end{itemize}
+
+\subsection{Data Augmentation}
+Audio augmentation is applied dynamically to the raw audio waveforms on the GPU using TensorFlow tensors:
+1. **Random Gaussian Noise:** Injects a standard normal distribution of noise to the waveform:
+   $$\tilde{x} = x + \mathcal{N}(0, 0.003)$$
+2. **Random Time Shift:** Randomly shifts the waveform array using circular shift:
+   $$\tilde{x} = \text{roll}(x, \text{shift}) \quad \text{where } \text{shift} \in [-1000, 1000] \text{ samples}$$
+3. **Volume Variation (Gain):** Scales the amplitude by a random factor:
+   $$\tilde{x} = x \times g \quad \text{where } g \sim \mathcal{U}(0.8, 1.2)$$
+
+\subsection{Onboard Mel-Spectrogram Layer}
+The model includes a custom Keras layer, \texttt{MelSpectrogram}, which computes the Log-Mel Spectrogram of the raw input waveform. This design choice allows the model to accept raw audio float32 arrays directly, rather than requiring separate preprocessing transforms during deployment.
+
+The transformation parameters are configured to match a 64 mel filterbank:
+* **Frame Length:** $1024$ samples ($64\text{ ms}$)
+* **Frame Step:** $512$ samples ($32\text{ ms}$)
+* **FFT Length:** $1024$
+* **Mel Bins:** $64$
+* **Frequency Range:** $80\text{ Hz}$ to $7600\text{ Hz}$
+
+\begin{lstlisting}[language=Python, caption={Custom Keras Onboard MelSpectrogram Layer}]
+class MelSpectrogram(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(MelSpectrogram, self).__init__(**kwargs)
+
+    def call(self, audio):
+        # Compute Short-Time Fourier Transform (STFT)
+        stfts = tf.signal.stft(audio, frame_length=1024,
+                               frame_step=512, fft_length=1024)
+        spectrograms = tf.abs(stfts)
+        
+        # Warp the linear scale spectrograms into the mel-scale
+        num_spectrogram_bins = stfts.shape[-1]
+        mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
+            num_mel_bins, num_spectrogram_bins, TARGET_SAMPLE_RATE,
+            lower_edge_hertz, upper_edge_hertz)
+        
+        mel_spectrograms = tf.tensordot(spectrograms, mel_weight_matrix, 1)
+        mel_spectrograms.set_shape(spectrograms.shape[:-1].concatenate(
+            mel_weight_matrix.shape[-1:]))
+            
+        # Log mel spectrograms
+        log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
+        
+        # Add channel dimension: (Batch, Frames, Mels, 1)
+        return tf.expand_dims(log_mel_spectrograms, -1)
+\end{lstlisting}
+
+\subsection{Model Architecture}
+The Keras model takes an input shape of $(Batch, 16000)$ and feeds it through the custom MelSpectrogram layer before passing it to the 2D Convolutional layers.
+
+\begin{lstlisting}[language=Python, caption={TensorFlow/Keras CNN Model Structure}]
+def build_model(num_classes):
+    audio_input = tf.keras.Input(shape=(NUM_SAMPLES,), name='audio')
+    
+    # Extract Mel-Spectrogram on-board
+    x = MelSpectrogram()(audio_input)
+
+    # Convolutional Layers
+    x = tf.keras.layers.Conv2D(16, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    x = tf.keras.layers.Conv2D(32, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    x = tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    # Resize spatial features to a fixed 4x4 resolution
+    x = tf.keras.layers.Resizing(4, 4)(x)
+    
+    # Dense Fully Connected Layers
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
+    outputs = tf.keras.layers.Dense(num_classes)(x)
+    
+    return tf.keras.Model(inputs=audio_input, outputs=outputs)
+\end{lstlisting}
+
+Unlike the PyTorch model which uses adaptive average pooling to enforce output dimensions, this network uses the Keras \texttt{Resizing} layer to resize spatial features to a fixed $4\times4$ resolution, providing a deterministic input size of 1024 flat units before the dense classification layer.
+
+\subsection{Training Configurations}
+The model is compiled with the Adam optimizer ($\eta = 0.001$) and trained over 30 epochs:
+\begin{lstlisting}[language=Python, caption={Compile and Callbacks Configuration}]
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+early_stopping = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=5,
+    restore_best_weights=True
+)
+
+reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+    monitor='val_loss',
+    factor=0.5,
+    patience=2,
+    verbose=1
+)
+\end{lstlisting}
+*Note: Using \texttt{'sparse\_categorical\_crossentropy'} on a linear output without a softmax activation layer requires setting \texttt{from\_logits=True} during compilation to prevent training instabilities. Although the notebook omitted this parameter, it serves as a point of comparison with PyTorch's cross-entropy loss.*
+
+\subsection{ONNX Export via tf2onnx}
+After training, the model is evaluated on the test set and converted to ONNX using the \texttt{tf2onnx} package:
+\begin{lstlisting}[language=Python, caption={tf2onnx Model Conversion}]
+import tf2onnx
+
+# Define dynamic batch input signature
+input_signature = [tf.TensorSpec([None, NUM_SAMPLES], tf.float32, name='input')]
+
+# Convert from Keras model
+onnx_model, _ = tf2onnx.convert.from_keras(
+    model,
+    input_signature=input_signature,
+    opset=13
+)
+
+with open('../keyword_detector.onnx', "wb") as f:
+    f.write(onnx_model.SerializeToString())
+\end{lstlisting}
+This packages the custom MelSpectrogram layer directly into the exported graph, saving the model as a self-contained \texttt{keyword\_detector.onnx} file that accepts raw float arrays.
