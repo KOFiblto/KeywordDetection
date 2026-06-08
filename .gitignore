@@ -29,3 +29,5 @@ env/
 
 !frontend/package.json
 Utils/PyTorch_wronglist.txt
+
+*build/
