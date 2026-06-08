@@ -202,7 +202,14 @@ async def infer(audio: UploadFile = File(...)):
             "classes": CLASSES
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 if __name__ == "__main__":
     import uvicorn
