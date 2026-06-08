@@ -205,11 +205,16 @@ In real-time environments, background noise can cause false positive detections.
 These filters reduced false positive detections in the live web application by approximately 50\%.
 
 \subsection{ONNX Export}
-The model is exported to ONNX format to allow real-time inference in the desktop application without running a full PyTorch environment in the frontend process. The dynamic axes are configured to handle variable batch sizes and time feature dimensions:
+The model is exported to ONNX format to allow real-time inference in the desktop application without running a full PyTorch environment in the frontend process. The exporter uses PyTorch 2.9/2.10+ Dynamo tracing and configures dynamic shapes for batch size and time dimensions. To avoid CP1252 print-encoding crashes on Windows, standard output is programmatically reconfigured to UTF-8. The model is exported to a single self-contained ONNX file by disabling external data:
 \begin{lstlisting}[language=Python, caption={ONNX Export Script}]
-dynamic_axes = {
-    'mfcc_input': {0: 'batch_size', 3: 'time'},
-    'logits': {0: 'batch_size'}
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
+dynamic_shapes = {
+    'x': {0: 'batch_size', 3: 'time'}
 }
 torch.onnx.export(
     best_model,
@@ -220,10 +225,11 @@ torch.onnx.export(
     do_constant_folding=True,
     input_names=['mfcc_input'],
     output_names=['logits'],
-    dynamic_axes=dynamic_axes
+    dynamic_shapes=dynamic_shapes,
+    external_data=False
 )
 \end{lstlisting}
-The exported file is saved as \texttt{PyTorch.onnx} and executed using ONNX Runtime.
+The exported file is saved as a single self-contained \texttt{PyTorch.onnx} and executed using ONNX Runtime.
 
 \subsection{Centralized Configuration and Shared Environment}
 To prevent configuration drift and coordinate operations between training notebooks, command-line dataset analysis scripts, and production servers, a centralized configuration file \texttt{config.json} is maintained in the repository root. This file defines key parameters:

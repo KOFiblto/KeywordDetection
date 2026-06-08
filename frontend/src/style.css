@@ -963,3 +963,56 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .cmd-up { color: var(--color-up) !important; text-shadow: 0 0 8px var(--color-up); }
 .cmd-down { color: var(--color-down) !important; text-shadow: 0 0 8px var(--color-down); }
 .cmd-other { color: var(--color-other) !important; text-shadow: 0 0 8px var(--color-other); }
+
+/* Dual Model Live Styles */
+.dual-controls-bar {
+  flex-wrap: wrap;
+}
+
+.model-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.model-select-group label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.dual-model-select {
+  min-width: 180px;
+}
+
+.dual-results-dashboard {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.dual-result-card {
+  flex: 1;
+  background: linear-gradient(135deg, #090909 0%, #020202 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.dual-result-card .card-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.dual-visualizer-container {
+  display: flex;
+  gap: 1.5rem;
+  flex-grow: 1;
+}

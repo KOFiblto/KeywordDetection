@@ -556,12 +556,17 @@ To enable real-time inference in the Node/Electron application without running a
 
 The ONNX export procedure is implemented in the notebook using the following script:
 ```python
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*version conversion.*")
 
-dynamic_axes = {
-    'mfcc_input': {0: 'batch_size', 3: 'time'},
-    'logits': {0: 'batch_size'}
+# Use dynamic_shapes for PyTorch 2.9+ Dynamo exporter
+dynamic_shapes = {
+    'x': {0: 'batch_size', 3: 'time'}
 }
 
 best_model.eval()
@@ -580,11 +585,12 @@ try:
         dummy_input,
         os.path.abspath(str(cfg.MODEL_PATH_ONNX)),
         export_params=True,
-        opset_version=18,     # Set to 18 for modern ONNX runtime compatibility
+        opset_version=18,     # Set to 18 for broad modern ONNX compatibility
         do_constant_folding=True,
         input_names=['mfcc_input'],
         output_names=['logits'],
-        dynamic_axes=dynamic_axes,
+        dynamic_shapes=dynamic_shapes,
+        external_data=False,  # Embed weights directly in a single ONNX file
         verbose=False
     )
     print(f"✅ SUCCESS: {cfg.MODEL_PATH_ONNX}")
