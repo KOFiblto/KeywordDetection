@@ -152,7 +152,7 @@ def set_model(req: SetModelRequest):
 def get_models():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     pytorch_models_dir = os.path.join(base_dir, "PyTorch", "Models")
-    tensorflow_models_dir = os.path.join(base_dir, "Tensorflow", "Models")
+    tensorflow_models_dir = os.path.join(base_dir, "TensorFlow", "Models")
     
     models = []
     
@@ -162,7 +162,7 @@ def get_models():
             if f.endswith(".onnx"):
                 models.append(os.path.join(pytorch_models_dir, f))
                 
-    # scan Tensorflow/Models
+    # scan TensorFlow/Models
     if os.path.exists(tensorflow_models_dir):
         for f in os.listdir(tensorflow_models_dir):
             if f.endswith(".onnx"):
