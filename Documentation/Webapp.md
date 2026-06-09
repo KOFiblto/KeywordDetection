@@ -41,7 +41,7 @@ The backend is built using FastAPI and run via Uvicorn. It is configured to allo
 
 ### 2.1 API Endpoints
 * **`GET /models`**
-  Scans `PyTorch/Models/` and `Tensorflow/Models/` directories for `.onnx` files, returning a list of available models and the current active model.
+  Scans `PyTorch/Models/` and `TensorFlow/Models/` directories for `.onnx` files, returning a list of available models and the current active model.
 * **`POST /set_model`**
   Dynamically switches the active model file. Receives a JSON request body:
   ```json
