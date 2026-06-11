@@ -6,7 +6,7 @@ echo.
 
 :: 1. Build PyInstaller Python Backend
 echo [1/4] Compiling Python FastAPI backend with PyInstaller...
-call .\.venv\Scripts\pyinstaller --noconfirm --onedir --console --name backend_api backend/main.py
+call .\.venv\Scripts\pyinstaller --noconfirm --onedir --console --name backend_api --exclude-module torch --exclude-module torchaudio --exclude-module torchvision --exclude-module scipy --exclude-module PyQt6 --exclude-module matplotlib --exclude-module seaborn --exclude-module PIL --exclude-module pandas --exclude-module tkinter --exclude-module docutils --exclude-module IPython backend/main.py
 if %ERRORLEVEL% neq 0 (
     echo Error compiling backend with PyInstaller.
     pause
