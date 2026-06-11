@@ -37,10 +37,10 @@ jobs:
           cd frontend
           npx cap sync android
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'zulu'
 
       - name: Build Android APK
@@ -86,7 +86,7 @@ jobs:
       - name: Build iOS App (Unsigned)
         run: |
           cd frontend/ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -destination 'generic/platform=iOS' clean build
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -destination 'generic/platform=iOS' clean build
 
       - name: Compress iOS Build
         run: |

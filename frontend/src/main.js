@@ -5,7 +5,7 @@ import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 
 const isDev = import.meta.env.DEV;
 ort.env.wasm.wasmPaths = isDev 
-    ? 'https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.20.0/' 
+    ? 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/' 
     : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'wasm/';
 ort.env.wasm.numThreads = 1;
 
