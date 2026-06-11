@@ -23,8 +23,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load config
-CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.json"))
+import sys
+
+# Base directory logic to support pyinstaller and dev
+if getattr(sys, 'frozen', False):
+    exe_dir = os.path.dirname(sys.executable)
+    base_dir = exe_dir
+    for _ in range(5):
+        if os.path.exists(os.path.join(base_dir, "config.json")):
+            break
+        base_dir = os.path.dirname(base_dir)
+    BASE_DIR = os.path.abspath(base_dir)
+else:
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 try:
     with open(CONFIG_PATH, "r") as f:
         config_data = json.load(f)
@@ -117,7 +130,7 @@ def get_or_load_model(path: str):
     return session, transform
 
 # State
-current_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "PyTorch", "Models", "PyTorch.onnx"))
+current_model_path = os.path.abspath(os.path.join(BASE_DIR, "PyTorch", "Models", "PyTorch.onnx"))
 current_model_type = "onnx"
 ort_session = None
 
@@ -150,9 +163,8 @@ def set_model(req: SetModelRequest):
 
 @app.get("/models")
 def get_models():
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    pytorch_models_dir = os.path.join(base_dir, "PyTorch", "Models")
-    tensorflow_models_dir = os.path.join(base_dir, "TensorFlow", "Models")
+    pytorch_models_dir = os.path.join(BASE_DIR, "PyTorch", "Models")
+    tensorflow_models_dir = os.path.join(BASE_DIR, "Tensorflow", "Models")
     
     models = []
     
@@ -162,7 +174,7 @@ def get_models():
             if f.endswith(".onnx"):
                 models.append(os.path.join(pytorch_models_dir, f))
                 
-    # scan TensorFlow/Models
+    # scan Tensorflow/Models
     if os.path.exists(tensorflow_models_dir):
         for f in os.listdir(tensorflow_models_dir):
             if f.endswith(".onnx"):
