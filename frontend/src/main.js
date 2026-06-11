@@ -38,7 +38,7 @@ async function loadSession(modelPath) {
     }
     
     const inputNames = session.inputNames;
-    const inputShape = inputNames.length > 0 ? session.toObject()[inputNames[0]].dims : [];
+    const inputShape = (session.inputMetadata && session.inputMetadata[0]) ? session.inputMetadata[0].shape : [];
     console.log(`Model input shape for ${name}:`, inputShape);
     
     let featuresDim = 40;
@@ -555,7 +555,7 @@ if (window.electronAPI) {
                 const session = await ort.InferenceSession.create(buffer);
                 
                 const inputNames = session.inputNames;
-                const inputShape = inputNames.length > 0 ? session.toObject()[inputNames[0]].dims : [];
+                const inputShape = (session.inputMetadata && session.inputMetadata[0]) ? session.inputMetadata[0].shape : [];
                 
                 let isV2 = false;
                 let featuresDim = 40;
