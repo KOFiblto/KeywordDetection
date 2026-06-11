@@ -340,10 +340,9 @@ async function inferAudio(audioData, resultElement, isLiveMode = false, modelPat
             let samples = audioBuffer.getChannelData(0);
             
             // Resample to 16000Hz if needed
-            const TARGET_SAMPLE_RATE = 16000;
             waveform = samples;
-            if (audioBuffer.sampleRate !== TARGET_SAMPLE_RATE) {
-                const ratio = TARGET_SAMPLE_RATE / audioBuffer.sampleRate;
+            if (audioBuffer.sampleRate !== SAMPLE_RATE) {
+                const ratio = SAMPLE_RATE / audioBuffer.sampleRate;
                 const newLength = Math.round(samples.length * ratio);
                 const resampled = new Float32Array(newLength);
                 for (let i = 0; i < newLength; i++) {
@@ -374,9 +373,9 @@ async function inferAudio(audioData, resultElement, isLiveMode = false, modelPat
         // Preprocess features using the JS DSP functions
         let preprocessed;
         if (isV2) {
-            preprocessed = preprocessMelSpectrogram(waveform, TARGET_SAMPLE_RATE, 400, 160, 64);
+            preprocessed = preprocessMelSpectrogram(waveform, SAMPLE_RATE, 400, 160, 64);
         } else {
-            preprocessed = preprocessMfcc(waveform, TARGET_SAMPLE_RATE, 40, 64);
+            preprocessed = preprocessMfcc(waveform, SAMPLE_RATE, 40, 64);
         }
         
         // Shape mapping

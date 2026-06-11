@@ -90,7 +90,7 @@ jobs:
 
       - name: Compress iOS Build
         run: |
-          cd frontend/ios/App/build/Release-iphoneos
+          cd frontend/ios/App/build/Debug-iphoneos
           zip -r ../../../../Auditory-AI-iOS-Unsigned.zip App.app
 
       - name: Upload iOS Artifact
