@@ -3,7 +3,7 @@ import { initGames, switchGame, startGame, stopActiveGame, handleGameVoiceComman
 import * as ort from 'onnxruntime-web';
 import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 
-ort.env.wasm.wasmPaths = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+ort.env.wasm.wasmPaths = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'wasm/';
 ort.env.wasm.numThreads = 1;
 
 const AVAILABLE_MODELS = [
