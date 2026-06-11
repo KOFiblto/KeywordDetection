@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -8,7 +8,8 @@
     "start": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dist-app": "vite build && electron-builder"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -20,5 +21,51 @@
   },
   "dependencies": {
     "wavesurfer.js": "^7.12.6"
+  },
+  "build": {
+    "compression": "store",
+    "appId": "com.keyword.detection",
+    "productName": "Auditory AI",
+    "directories": {
+      "output": "dist-app"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Auditory AI",
+      "useZip": true
+    },
+    "files": [
+      "dist/**/*",
+      "main.cjs",
+      "preload.cjs",
+      "package.json",
+      "splash.html",
+      "splash_logo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/backend_api",
+        "to": "backend_api"
+      },
+      {
+        "from": "../config.json",
+        "to": "config.json"
+      },
+      {
+        "from": "../PyTorch/Models/PyTorch.onnx",
+        "to": "PyTorch/Models/PyTorch.onnx"
+      },
+      {
+        "from": "../TensorFlow/Models/TensorFlow.onnx",
+        "to": "Tensorflow/Models/TensorFlow.onnx"
+      }
+    ]
   }
 }
