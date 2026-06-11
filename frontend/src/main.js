@@ -8,6 +8,7 @@ ort.env.wasm.wasmPaths = isDev
     ? 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/' 
     : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1) + 'wasm/';
 ort.env.wasm.numThreads = 1;
+ort.env.wasm.proxy = true;
 
 const AVAILABLE_MODELS = [
     'PyTorch.onnx',
@@ -323,34 +324,40 @@ async function setModel(path) {
     }
 }
 
-async function inferAudio(blob, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
+async function inferAudio(audioData, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
     try {
         const targetModelPath = modelPath || activeModelPath;
         const { session, isV2, inputShape, inputName } = await loadSession(targetModelPath);
         
-        // Decode WAV blob to Float32Array
-        const arrayBuffer = await blob.arrayBuffer();
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-        let samples = audioBuffer.getChannelData(0);
-        
-        // Resample to 16000Hz if needed
-        const TARGET_SAMPLE_RATE = 16000;
-        let waveform = samples;
-        if (audioBuffer.sampleRate !== TARGET_SAMPLE_RATE) {
-            const ratio = TARGET_SAMPLE_RATE / audioBuffer.sampleRate;
-            const newLength = Math.round(samples.length * ratio);
-            const resampled = new Float32Array(newLength);
-            for (let i = 0; i < newLength; i++) {
-                const srcIdx = i / ratio;
-                const baseIdx = Math.floor(srcIdx);
-                const nextIdx = Math.min(baseIdx + 1, samples.length - 1);
-                const frac = srcIdx - baseIdx;
-                resampled[i] = samples[baseIdx] * (1.0 - frac) + samples[nextIdx] * frac;
+        let waveform;
+        if (audioData instanceof Blob) {
+            // Decode WAV blob to Float32Array
+            const arrayBuffer = await audioData.arrayBuffer();
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
-            waveform = resampled;
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            let samples = audioBuffer.getChannelData(0);
+            
+            // Resample to 16000Hz if needed
+            const TARGET_SAMPLE_RATE = 16000;
+            waveform = samples;
+            if (audioBuffer.sampleRate !== TARGET_SAMPLE_RATE) {
+                const ratio = TARGET_SAMPLE_RATE / audioBuffer.sampleRate;
+                const newLength = Math.round(samples.length * ratio);
+                const resampled = new Float32Array(newLength);
+                for (let i = 0; i < newLength; i++) {
+                    const srcIdx = i / ratio;
+                    const baseIdx = Math.floor(srcIdx);
+                    const nextIdx = Math.min(baseIdx + 1, samples.length - 1);
+                    const frac = srcIdx - baseIdx;
+                    resampled[i] = samples[baseIdx] * (1.0 - frac) + samples[nextIdx] * frac;
+                }
+                waveform = resampled;
+            }
+        } else {
+            // Already raw Float32Array at 16000Hz from live audio context
+            waveform = audioData;
         }
         
         // Pad or truncate to exactly 16000 samples
@@ -981,8 +988,7 @@ async function startLive() {
                 samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
             }
             
-            const wavBlob = float32ToWav(samples, SAMPLE_RATE);
-            inferAudio(wavBlob, resultLive, true).then(() => {
+            inferAudio(samples, resultLive, true).then(() => {
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
             }).catch(() => {
@@ -1206,13 +1212,12 @@ async function startDualLive() {
                 samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
             }
             
-            const wavBlob = float32ToWav(samples, SAMPLE_RATE);
             const modelA = modelSelectA ? modelSelectA.value : '';
             const modelB = modelSelectB ? modelSelectB.value : '';
             
             Promise.all([
-                inferAudio(wavBlob, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
-                inferAudio(wavBlob, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
+                inferAudio(samples, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
+                inferAudio(samples, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
             ]).then(() => {
                 lastInferenceTimeDual = Date.now();
                 scheduleNextInferenceDual();
