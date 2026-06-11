@@ -20,6 +20,11 @@
     "wait-on": "^9.0.10"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "onnxruntime-web": "^1.26.0",
     "wavesurfer.js": "^7.12.6"
   },
   "build": {
@@ -51,20 +56,8 @@
     ],
     "extraResources": [
       {
-        "from": "../dist/backend_api",
-        "to": "backend_api"
-      },
-      {
         "from": "../config.json",
         "to": "config.json"
-      },
-      {
-        "from": "../PyTorch/Models/PyTorch.onnx",
-        "to": "PyTorch/Models/PyTorch.onnx"
-      },
-      {
-        "from": "../TensorFlow/Models/TensorFlow.onnx",
-        "to": "Tensorflow/Models/TensorFlow.onnx"
       }
     ]
   }

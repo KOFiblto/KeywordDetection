@@ -1,80 +1,92 @@
 # Keyword Detector
 
-A PyTorch-based neural network designed to detect specific spoken commands within audio files. Recently optimized for maximum accuracy and stability, reaching over ~98.5% validation accuracy.
+A deep learning project designed to recognize specific spoken command keywords (**yes**, **no**, **up**, **down**) and filter out background noise or other words. This system provides high-performance models implemented in both **PyTorch** and **TensorFlow**, ready to compile, export, and use.
 
-## Supported Keywords
+This repository contains isolated keyword spotters trained on the Google Speech Commands dataset. The models classify 1-second audio recordings into one of five classes: `yes`, `no`, `up`, `down`, and `other` (representing any other word or background noise). The project is optimized to reach over ~98.5% validation accuracy using Mel-Frequency Cepstral Coefficients (MFCC) feature extraction, audio data augmentation (time-shifting, noise injection), and SpecAugment (frequency and time masking). Both training pipelines export models directly to the ONNX format for efficient deployment.
 
-The model classifies audio into one of the following categories:
-* yes
-* no
-* up
-* down
+---
 
-## Project Structure
+<details>
+<summary>Project Structure</summary>
+
+Here is the visual structure of the project, focusing on the machine learning models and dataset:
 
 ```text
 .
-├─ dataset/
-│   ├─ yes/
-│   │   └─ *.wav
-│   ├─ no/
-│   │   └─ *.wav
-│   ├─ up/
-│   │   └─ *.wav
-│   └─ down/
-│       └─ *.wav
-└─ src/
-    ├─ main.py
-    ├─ main.ipynb
-    └─ _Antigravity/
-        ├─ Analyze Wave Files/    # Dataset statistics and distribution plots
-        │   ├─ analyze_wavs.py
-        │   ├─ dataset_distribution.png
-        │   └─ dataset_statistics.txt
-        └─ Testing/               # Progressive model enhancements & final architectures
-            ├─ 01_specaugment.py  ...  10_combined_best.py
-            ├─ 11_combined_stable.py    # Master model (MFCC, SpecAugment, DA, LR Scheduler)
-            ├─ 12_confusion_matrix.py   # Generates heatmaps
-            ├─ 13_kfold_cross_validation.py # Evaluates strictly using 5-Fold CV
-            ├─ run_all.py         # Batch evaluator runner
-            └─ Results/           # Final evaluation logs, checkpoints, and figures
+├── dataset/
+│   ├── yes/
+│   ├── no/
+│   ├── up/
+│   ├── down/
+│   └── other/
+├── install/
+│   ├── Download_Dataset.bat
+│   ├── install_requirements.bat
+│   └── pytorch/
+│       └── pytorch-requirements.txt
+├── PyTorch/
+│   ├── PyTorch.ipynb
+│   ├── Models/
+│   │   └── PyTorch.onnx
+│   └── Testing/
+├── TensorFlow/
+│   ├── tensorflow.ipynb
+│   └── Models/
+│       └── TensorFlow.onnx
+├── start.bat
+└── stop.bat
 ```
 
-## Features and Improvements
+* **[PyTorch](file:///c:/_school/KeywordDetection/PyTorch)**: Contains the training notebook [PyTorch/PyTorch.ipynb](file:///c:/_school/KeywordDetection/PyTorch/PyTorch.ipynb), model exports in [PyTorch/Models](file:///c:/_school/KeywordDetection/PyTorch/Models), and progressive enhancement tests in [PyTorch/Testing](file:///c:/_school/KeywordDetection/PyTorch/Testing).
+* **[TensorFlow](file:///c:/_school/KeywordDetection/TensorFlow)**: Contains the training notebook [TensorFlow/tensorflow.ipynb](file:///c:/_school/KeywordDetection/TensorFlow/tensorflow.ipynb) and export binaries in [TensorFlow/Models](file:///c:/_school/KeywordDetection/TensorFlow/Models).
+* **[dataset](file:///c:/_school/KeywordDetection/dataset)**: The target directory where audio commands are structured after extraction.
+* **[install](file:///c:/_school/KeywordDetection/install)**: Shell scripts and dependency definitions.
+</details>
 
-The core PyTorch model includes the following deep learning optimizations dynamically tested in the `Testing` directory:
-- **Audio Data Augmentation:** Random time-shifting and noise injection.
-- **SpecAugment:** `FrequencyMasking` and `TimeMasking` on the raw spectrogram transforms to construct robust features.
-- **MFCC:** Replacing standard MelSpectrograms with 40-channel MFCC generation for isolated vocal context.
-- **Network Depth & Capacity:** 4-layer CNN with expanding filter capacity (16 -> 128) and aggressive dropout.
-- **Optimization Strategy:** Adam optimizer coupled with `ReduceLROnPlateau` and intelligent model checkpointing.
+<details>
+<summary>Installation and Setup</summary>
 
-## Requirements
+### 1. Install Dependencies
+Run the install batch script to set up Python packages like PyTorch, torchaudio, scikit-learn, and soundfile:
 
-Currently built and optimized inside a local virtual environment (`.venv`) utilizing PyTorch, torchaudio, scikit-learn, soundfile, matplotlib, and seaborn.
-
-## Usage
-
-### Analyzing Dataset
-Run the data visualization script to measure audio clip lengths across all classes:
-```bash
-python "src/_Antigravity/Analyze Wave Files/analyze_wavs.py"
+```cmd
+.\install\install_requirements.bat
 ```
 
-### Running Model Tests
-You can execute and log all progressively built tests automatically via the `run_all.py` suite. All logs output directly to `src/_Antigravity/Testing/Results/Results.txt`:
-```bash
-python "src/_Antigravity/Testing/run_all.py"
+*Note: For audio streaming in the local web application, make sure FFmpeg is installed and added to your system path.*
+
+### 2. Download and Restructure Dataset
+To download, extract, and clean the Google Speech Commands dataset automatically, run the dataset utility:
+
+```cmd
+.\install\Download_Dataset.bat
 ```
 
-To run a specific architecture standalone through the batch runner:
-```bash
-python "src/_Antigravity/Testing/run_all.py" 11_combined_stable.py
+The script will prompt you for two source choices:
+* **Option 1 (Local ZIP)**: Select a pre-downloaded dataset ZIP file on your machine.
+* **Option 2 (Kaggle API)**: Enter your Kaggle credentials to download the ~1.4GB dataset automatically.
+
+Once downloaded, the utility restructures the folders to retain the target keywords (`yes`, `no`, `up`, `down`), slices background noise into 1-second WAV files, and groups all other vocabulary categories into the `other` directory.
+</details>
+
+<details>
+<summary>Usage</summary>
+
+### Training Models
+To train the neural networks from scratch, open and run the interactive cells in the respective training notebooks:
+* For PyTorch: [PyTorch/PyTorch.ipynb](file:///c:/_school/KeywordDetection/PyTorch/PyTorch.ipynb)
+* For TensorFlow: [TensorFlow/tensorflow.ipynb](file:///c:/_school/KeywordDetection/TensorFlow/tensorflow.ipynb)
+
+### Running the Application
+The project includes a local backend inference service and frontend GUI. To start the application, execute the start script:
+
+```cmd
+.\start.bat
 ```
 
-### Advanced Evaluation
-Generate the definitive testing confusion matrix or compute true variance using K-Fold Validation manually:
-```bash
-python "src/_Antigravity/Testing/12_confusion_matrix.py"
-python "src/_Antigravity/Testing/13_kfold_cross_validation.py"
+To stop all active application processes, run:
+
+```cmd
+.\stop.bat
 ```
+</details>

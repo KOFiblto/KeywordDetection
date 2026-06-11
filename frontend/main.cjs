@@ -154,7 +154,8 @@ app.whenReady().then(() => {
   if (!isDev) {
     createSplashWindow()
   }
-  startBackend()
+  // Disable backend startup as we are now fully client-side JS
+  // startBackend()
   startStaticServer()
   createWindow()
 
@@ -191,7 +192,16 @@ ipcMain.handle('dialog:openFile', async () => {
   if (canceled) {
     return null
   } else {
-    return filePaths[0]
+    try {
+      const filePath = filePaths[0];
+      const data = fs.readFileSync(filePath);
+      return {
+        name: path.basename(filePath),
+        data: data
+      };
+    } catch (e) {
+      console.error("Error reading custom model:", e);
+      return null;
+    }
   }
 })
-

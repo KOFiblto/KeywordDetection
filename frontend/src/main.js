@@ -1,9 +1,64 @@
 import WaveSurfer from 'wavesurfer.js';
 import { initGames, switchGame, startGame, stopActiveGame, handleGameVoiceCommand } from './games.js';
+import * as ort from 'onnxruntime-web';
+import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 
-const BACKEND_URL = window.location.port === '5173' || window.location.hostname.includes('lhr.life') || window.location.hostname.includes('localtunnel') || window.location.hostname.includes('localexpose')
-    ? `${window.location.protocol}//${window.location.host}/api`
-    : `http://${window.location.hostname || 'localhost'}:18000`;
+const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+ort.env.wasm.wasmPaths = basePath + 'wasm/';
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.proxy = true;
+
+const AVAILABLE_MODELS = [
+    'PyTorch.onnx',
+    'TensorFlow.onnx'
+];
+let activeModelPath = 'PyTorch.onnx';
+const loadedSessions = {};
+
+const CLASSES = ["yes", "no", "up", "down", "other"];
+
+async function loadSession(modelPath) {
+    if (loadedSessions[modelPath]) {
+        return loadedSessions[modelPath];
+    }
+    
+    let session;
+    let isV2 = false;
+    let name = modelPath;
+    
+    if (modelPath.startsWith('custom_')) {
+        throw new Error(`Custom model session not found for ${modelPath}`);
+    } else {
+        const filename = modelPath.split(/[\\/]/).pop();
+        const url = `./Models/${filename}`;
+        console.log(`Loading ONNX model from: ${url}`);
+        session = await ort.InferenceSession.create(url);
+        name = filename;
+    }
+    
+    const inputNames = session.inputNames;
+    const inputShape = (session.inputMetadata && session.inputMetadata[0]) ? session.inputMetadata[0].shape : [];
+    console.log(`Model input shape for ${name}:`, inputShape);
+    
+    let featuresDim = 40;
+    if (inputShape && inputShape.length === 4) {
+        if (inputShape[3] === 1) {
+            featuresDim = inputShape[1];
+        } else {
+            featuresDim = inputShape[2];
+        }
+    } else if (inputShape && inputShape.length === 3) {
+        featuresDim = inputShape[1];
+    }
+    
+    if (featuresDim === 64 || name.includes('PyTorch2') || name.includes('PyTorch3')) {
+        isV2 = true;
+    }
+    
+    const res = { session, isV2, inputShape, inputName: inputNames[0] };
+    loadedSessions[modelPath] = res;
+    return res;
+}
 let audioContext = null;
 let mediaStream = null;
 
@@ -171,10 +226,7 @@ function resizeCanvases() {
 window.addEventListener('resize', resizeCanvases);
 resizeCanvases();
 
-// --- Backend API Calls ---
-let fetchRetryCount = 0;
-const MAX_FETCH_RETRIES = 5;
-const RETRY_DELAY_MS = 3000;
+// --- Client-side Model Preprocessing & Inference ---
 
 async function fetchModels() {
     const badge = document.getElementById('backend-status-badge');
@@ -183,16 +235,26 @@ async function fetchModels() {
         badge.className = 'status-badge checking';
     }
     
+    // Load config.json dynamically
     try {
-        const res = await fetch(`${BACKEND_URL}/models`);
-        const data = await res.json();
-        
+        const configRes = await fetch('./config.json');
+        const configData = await configRes.json();
+        if (configData.keywords) {
+            CLASSES.length = 0;
+            CLASSES.push(...configData.keywords);
+            console.log("Loaded classes dynamically:", CLASSES);
+        }
+    } catch (err) {
+        console.warn("Using default keywords, config.json not found:", err);
+    }
+    
+    try {
         modelSelect.innerHTML = '';
-        data.available_models.forEach(model => {
+        AVAILABLE_MODELS.forEach(model => {
             const opt = document.createElement('option');
             opt.value = model;
-            opt.textContent = model.split(/[\\/]/).pop();
-            if (model === data.current_model) opt.selected = true;
+            opt.textContent = model;
+            if (model === activeModelPath) opt.selected = true;
             modelSelect.appendChild(opt);
         });
         
@@ -200,19 +262,18 @@ async function fetchModels() {
         if (modelSelectA && modelSelectB) {
             modelSelectA.innerHTML = '';
             modelSelectB.innerHTML = '';
-            data.available_models.forEach((model, index) => {
+            AVAILABLE_MODELS.forEach((model, index) => {
                 const optA = document.createElement('option');
                 optA.value = model;
-                optA.textContent = model.split(/[\\/]/).pop();
+                optA.textContent = model;
                 
                 const optB = document.createElement('option');
                 optB.value = model;
-                optB.textContent = model.split(/[\\/]/).pop();
+                optB.textContent = model;
                 
-                // Select different defaults if possible to compare immediately
                 if (index === 0) {
                     optA.selected = true;
-                } else if (index === 1 || (data.available_models.length === 1 && index === 0)) {
+                } else if (index === 1 || (AVAILABLE_MODELS.length === 1 && index === 0)) {
                     optB.selected = true;
                 }
                 
@@ -223,80 +284,152 @@ async function fetchModels() {
         }
         
         if (badge) {
-            badge.textContent = 'Online';
+            badge.textContent = 'Active (Local)';
             badge.className = 'status-badge online';
         }
-        fetchRetryCount = 0; // reset retry counter on success
+        
+        // Load initial model
+        await setModel(activeModelPath);
     } catch (e) {
-        console.error("Failed to fetch models", e);
+        console.error("Failed to initialize local models", e);
         if (badge) {
             badge.textContent = 'Offline';
             badge.className = 'status-badge offline';
-        }
-        
-        if (fetchRetryCount < MAX_FETCH_RETRIES) {
-            fetchRetryCount++;
-            console.log(`Retrying to connect to backend (${fetchRetryCount}/${MAX_FETCH_RETRIES}) in ${RETRY_DELAY_MS/1000}s...`);
-            modelSelect.innerHTML = `<option value="error">Error loading models (Retrying ${fetchRetryCount}/${MAX_FETCH_RETRIES})...</option>`;
-            setTimeout(fetchModels, RETRY_DELAY_MS);
-        } else {
-            modelSelect.innerHTML = '<option value="error">Error loading models</option>';
         }
     }
 }
 
 async function setModel(path) {
     try {
-        const res = await fetch(`${BACKEND_URL}/set_model`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model_path: path })
-        });
-        const data = await res.json();
-        console.log("Set model result:", data);
-        if (data.status !== "success") {
-            alert("Failed to set model");
+        activeModelPath = path;
+        const badge = document.getElementById('backend-status-badge');
+        if (badge) {
+            badge.textContent = 'Loading Model...';
+            badge.className = 'status-badge checking';
+        }
+        await loadSession(path);
+        if (badge) {
+            badge.textContent = 'Active (Local)';
+            badge.className = 'status-badge online';
         }
     } catch (e) {
         console.error("Failed to set model", e);
+        const badge = document.getElementById('backend-status-badge');
+        if (badge) {
+            badge.textContent = 'Error Loading';
+            badge.className = 'status-badge offline';
+        }
     }
 }
 
-async function inferAudio(blob, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
-    const formData = new FormData();
-    formData.append('audio', blob, 'audio.wav');
-    if (modelPath) {
-        formData.append('model_path', modelPath);
-    }
-    
+async function inferAudio(audioData, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
     try {
-        const res = await fetch(`${BACKEND_URL}/infer`, {
-            method: 'POST',
-            body: formData
-        });
-        const data = await res.json();
-        if (data.status === "success") {
-            const keyword = data.keyword.toUpperCase();
-            resultElement.textContent = `Detected: ${keyword}`;
+        const targetModelPath = modelPath || activeModelPath;
+        const { session, isV2, inputShape, inputName } = await loadSession(targetModelPath);
+        
+        let waveform;
+        if (audioData instanceof Blob) {
+            // Decode WAV blob to Float32Array
+            const arrayBuffer = await audioData.arrayBuffer();
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            let samples = audioBuffer.getChannelData(0);
             
-            // Remove previous classes
-            resultElement.classList.remove('detected-yes', 'detected-no', 'detected-up', 'detected-down', 'detected-other');
-            
-            // Add class for coloring + pulsating animation
-            const kwLower = keyword.toLowerCase();
-            if (['yes', 'no', 'up', 'down', 'other'].includes(kwLower)) {
-                resultElement.classList.add(`detected-${kwLower}`);
+            // Resample to 16000Hz if needed
+            waveform = samples;
+            if (audioBuffer.sampleRate !== SAMPLE_RATE) {
+                const ratio = SAMPLE_RATE / audioBuffer.sampleRate;
+                const newLength = Math.round(samples.length * ratio);
+                const resampled = new Float32Array(newLength);
+                for (let i = 0; i < newLength; i++) {
+                    const srcIdx = i / ratio;
+                    const baseIdx = Math.floor(srcIdx);
+                    const nextIdx = Math.min(baseIdx + 1, samples.length - 1);
+                    const frac = srcIdx - baseIdx;
+                    resampled[i] = samples[baseIdx] * (1.0 - frac) + samples[nextIdx] * frac;
+                }
+                waveform = resampled;
+            }
+        } else {
+            // Already raw Float32Array at 16000Hz from live audio context
+            waveform = audioData;
+        }
+        
+        // Pad or truncate to exactly 16000 samples
+        const NUM_SAMPLES = 16000;
+        if (waveform.length > NUM_SAMPLES) {
+            const start = Math.floor((waveform.length - NUM_SAMPLES) / 2);
+            waveform = waveform.slice(start, start + NUM_SAMPLES);
+        } else if (waveform.length < NUM_SAMPLES) {
+            const padded = new Float32Array(NUM_SAMPLES);
+            padded.set(waveform);
+            waveform = padded;
+        }
+        
+        // Preprocess features using the JS DSP functions
+        let preprocessed;
+        if (isV2) {
+            preprocessed = preprocessMelSpectrogram(waveform, SAMPLE_RATE, 400, 160, 64);
+        } else {
+            preprocessed = preprocessMfcc(waveform, SAMPLE_RATE, 40, 64);
+        }
+        
+        // Shape mapping
+        let shape;
+        const h = preprocessed.rows;
+        const w = preprocessed.cols;
+        
+        if (inputShape.length === 4) {
+            if (inputShape[3] === 1 || inputShape[3] === '1') {
+                shape = [1, h, w, 1];
             } else {
-                resultElement.classList.add('detected-other');
+                shape = [1, 1, h, w];
             }
-            
-            if (highlightCallback) {
-                highlightCallback(keyword);
-            } else if (isLiveMode) {
-                drawHighlight(keyword);
-                // Send voice command to games
-                handleGameVoiceCommand(keyword);
+        } else if (inputShape.length === 3) {
+            shape = [1, h, w];
+        } else {
+            shape = [1, 1, h, w];
+        }
+        
+        const inputTensor = new ort.Tensor('float32', preprocessed.data, shape);
+        const feeds = {};
+        feeds[inputName] = inputTensor;
+        
+        const results = await session.run(feeds);
+        const outputName = session.outputNames[0];
+        const logits = results[outputName].data;
+        
+        // Find argmax
+        let maxVal = -Infinity;
+        let predictedIdx = 0;
+        for (let i = 0; i < logits.length; i++) {
+            if (logits[i] > maxVal) {
+                maxVal = logits[i];
+                predictedIdx = i;
             }
+        }
+        
+        const keyword = CLASSES[predictedIdx].toUpperCase();
+        resultElement.textContent = `Detected: ${keyword}`;
+        
+        // Remove previous classes
+        resultElement.classList.remove('detected-yes', 'detected-no', 'detected-up', 'detected-down', 'detected-other');
+        
+        // Add class for coloring + pulsating animation
+        const kwLower = keyword.toLowerCase();
+        if (['yes', 'no', 'up', 'down', 'other'].includes(kwLower)) {
+            resultElement.classList.add(`detected-${kwLower}`);
+        } else {
+            resultElement.classList.add('detected-other');
+        }
+        
+        if (highlightCallback) {
+            highlightCallback(keyword);
+        } else if (isLiveMode) {
+            drawHighlight(keyword);
+            handleGameVoiceCommand(keyword);
         }
     } catch (e) {
         console.error("Inference failed", e);
@@ -416,14 +549,45 @@ modelSelect.addEventListener('change', (e) => {
 
 if (window.electronAPI) {
     customModelBtn.addEventListener('click', async () => {
-        const filePath = await window.electronAPI.openFile();
-        if (filePath) {
-            const opt = document.createElement('option');
-            opt.value = filePath;
-            opt.textContent = `Custom: ${filePath.split(/[\\/]/).pop()}`;
-            opt.selected = true;
-            modelSelect.appendChild(opt);
-            setModel(filePath);
+        const fileInfo = await window.electronAPI.openFile();
+        if (fileInfo) {
+            const name = fileInfo.name;
+            const buffer = fileInfo.data; // Uint8Array
+            
+            try {
+                console.log(`Loading custom model client-side: ${name}`);
+                const session = await ort.InferenceSession.create(buffer);
+                
+                const inputNames = session.inputNames;
+                const inputShape = (session.inputMetadata && session.inputMetadata[0]) ? session.inputMetadata[0].shape : [];
+                
+                let isV2 = false;
+                let featuresDim = 40;
+                if (inputShape && inputShape.length === 4) {
+                    if (inputShape[3] === 1) featuresDim = inputShape[1];
+                    else featuresDim = inputShape[2];
+                } else if (inputShape && inputShape.length === 3) {
+                    featuresDim = inputShape[1];
+                }
+                if (featuresDim === 64 || name.includes('PyTorch2') || name.includes('PyTorch3')) {
+                    isV2 = true;
+                }
+                
+                const res = { session, isV2, inputShape, inputName: inputNames[0] };
+                const key = `custom_${name}`;
+                loadedSessions[key] = res;
+                
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = `Custom: ${name}`;
+                opt.selected = true;
+                modelSelect.appendChild(opt);
+                
+                await setModel(key);
+            } catch (err) {
+                console.error("Failed to load custom model", err);
+                alert(`Failed to load custom model: ${err.message}`);
+            }
         }
     });
 } else {
@@ -821,8 +985,7 @@ async function startLive() {
                 samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
             }
             
-            const wavBlob = float32ToWav(samples, SAMPLE_RATE);
-            inferAudio(wavBlob, resultLive, true).then(() => {
+            inferAudio(samples, resultLive, true).then(() => {
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
             }).catch(() => {
@@ -1046,13 +1209,12 @@ async function startDualLive() {
                 samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
             }
             
-            const wavBlob = float32ToWav(samples, SAMPLE_RATE);
             const modelA = modelSelectA ? modelSelectA.value : '';
             const modelB = modelSelectB ? modelSelectB.value : '';
             
             Promise.all([
-                inferAudio(wavBlob, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
-                inferAudio(wavBlob, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
+                inferAudio(samples, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
+                inferAudio(samples, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
             ]).then(() => {
                 lastInferenceTimeDual = Date.now();
                 scheduleNextInferenceDual();
