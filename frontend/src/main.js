@@ -1116,3 +1116,14 @@ sidebarTabs.forEach(tab => {
     tab.addEventListener('click', closeSidebar);
 });
 
+// Set dynamic version and release date in About screen
+const aboutVersion = document.getElementById('about-version');
+const aboutReleaseDate = document.getElementById('about-release-date');
+if (aboutVersion && typeof __APP_VERSION__ !== 'undefined') {
+  aboutVersion.textContent = __APP_VERSION__;
+}
+if (aboutReleaseDate && typeof __RELEASE_DATE__ !== 'undefined') {
+  aboutReleaseDate.textContent = __RELEASE_DATE__;
+}
+
+
