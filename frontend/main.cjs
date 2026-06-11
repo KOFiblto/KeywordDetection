@@ -9,7 +9,7 @@ let mainWindow
 let backendProcess = null
 let staticServer = null
 
-const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
+const isDev = !app.isPackaged;
 
 function startBackend() {
   if (isDev) return;
@@ -113,12 +113,28 @@ function createWindow() {
 
   if (!isDev) {
     mainWindow.once('ready-to-show', () => {
-      // Keep splash for a short moment (1.5s) to let server bind and feel premium
+      // Keep splash for 1.5s, then fade out smoothly
       setTimeout(() => {
-        if (splashWindow) {
-          splashWindow.close()
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          let opacity = 1.0;
+          const fadeInterval = setInterval(() => {
+            if (splashWindow.isDestroyed()) {
+              clearInterval(fadeInterval);
+              mainWindow.show();
+              return;
+            }
+            if (opacity <= 0.05) {
+              clearInterval(fadeInterval);
+              splashWindow.close();
+              mainWindow.show();
+            } else {
+              opacity -= 0.05;
+              splashWindow.setOpacity(opacity);
+            }
+          }, 20);
+        } else {
+          mainWindow.show();
         }
-        mainWindow.show()
       }, 1500)
     })
   }

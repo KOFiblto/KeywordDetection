@@ -31,3 +31,6 @@ env/
 Utils/PyTorch_wronglist.txt
 
 *build/
+dist/
+*.spec
+frontend/dist-app/
