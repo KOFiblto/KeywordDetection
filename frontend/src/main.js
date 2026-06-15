@@ -1,6 +1,6 @@
 import WaveSurfer from 'wavesurfer.js';
 import { initGames, switchGame, startGame, stopActiveGame, handleGameVoiceCommand } from './games.js';
-import * as ort from 'onnxruntime-web';
+import * as ort from 'onnxruntime-web/wasm';
 import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 
 const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
