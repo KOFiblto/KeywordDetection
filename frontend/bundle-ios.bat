@@ -24,9 +24,9 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo =========================================================
-echo Packaging Xcode project to Auditory-AI-Xcode.zip...
+echo Packaging Xcode project to auditory-ai-xcode.zip...
 echo =========================================================
-powershell -Command "if (Test-Path Auditory-AI-Xcode.zip) { Remove-Item Auditory-AI-Xcode.zip }; Compress-Archive -Path ios -DestinationPath Auditory-AI-Xcode.zip -Force"
+powershell -Command "if (Test-Path auditory-ai-xcode.zip) { Remove-Item auditory-ai-xcode.zip }; Compress-Archive -Path ios -DestinationPath auditory-ai-xcode.zip -Force"
 if %ERRORLEVEL% neq 0 (
     echo.
     echo [ERROR] Failed to zip Xcode project.
@@ -36,7 +36,7 @@ if %ERRORLEVEL% neq 0 (
 
 echo.
 echo =========================================================
-echo Success! Created Auditory-AI-Xcode.zip in the frontend folder.
+echo Success! Created auditory-ai-xcode.zip in the frontend folder.
 echo You can now send this zip file to your friend to open in Xcode.
 echo =========================================================
 pause

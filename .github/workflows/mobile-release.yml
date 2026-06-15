@@ -49,11 +49,15 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Rename APK file
+        run: |
+          mv frontend/android/app/build/outputs/apk/debug/app-debug.apk frontend/android/app/build/outputs/apk/debug/auditory-ai.apk
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auditory-AI-Android-Debug
-          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          name: auditory-ai.apk
+          path: frontend/android/app/build/outputs/apk/debug/auditory-ai.apk
 
   build-ios:
     runs-on: macos-latest
@@ -85,13 +89,13 @@ jobs:
 
       - name: Package Xcode Project ZIP
         run: |
-          zip -r Auditory-AI-Xcode-Project.zip frontend/ios
+          zip -r auditory-ai-xcode.zip frontend/ios
 
       - name: Upload Xcode Project Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auditory-AI-Xcode-Project
-          path: Auditory-AI-Xcode-Project.zip
+          name: auditory-ai-xcode.zip
+          path: auditory-ai-xcode.zip
 
       - name: Build iOS App (Unsigned)
         run: |
@@ -103,10 +107,48 @@ jobs:
           cd frontend/ios/App/build/Debug-iphoneos
           mkdir Payload
           cp -r App.app Payload/
-          zip -r ../../../../Auditory-AI-iOS-Unsigned.ipa Payload
+          zip -r ../../../../auditory-ai.ipa Payload
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auditory-AI-iOS-Unsigned-IPA
-          path: Auditory-AI-iOS-Unsigned.ipa
+          name: auditory-ai.ipa
+          path: auditory-ai.ipa
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-android, build-ios]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or Update Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd release-assets
+          
+          # Delete existing 'latest' release and its tag if it exists, to keep assets clean
+          if gh release view latest >/dev/null 2>&1; then
+            echo "Release 'latest' exists. Recreating it to keep assets clean..."
+            gh release delete latest --yes --cleanup-tag || true
+            sleep 2
+          fi
+          
+          echo "Creating 'latest' release with the new assets..."
+          gh release create latest \
+            auditory-ai.apk \
+            auditory-ai.ipa \
+            auditory-ai-xcode.zip \
+            --title "Latest Development Build" \
+            --notes "Automated build of the latest commit on branch **${{ github.ref_name }}** (commit: ${{ github.sha }}). Updated on $(date -u +'%Y-%m-%d %H:%M:%S UTC')." \
+            --prerelease \
+            --target ${{ github.sha }}
