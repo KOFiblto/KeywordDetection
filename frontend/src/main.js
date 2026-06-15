@@ -6,7 +6,7 @@ import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
 ort.env.wasm.wasmPaths = basePath + 'wasm/';
 ort.env.wasm.numThreads = 1;
-ort.env.wasm.proxy = true;
+ort.env.wasm.proxy = !window.Capacitor;
 
 const AVAILABLE_MODELS = [
     'PyTorch.onnx',
