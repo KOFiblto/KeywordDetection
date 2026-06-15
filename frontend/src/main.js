@@ -344,7 +344,6 @@ async function setModel(path) {
 }
 
 async function inferAudio(audioData, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
-    console.log("[DEBUG] inferAudio called. isLiveMode =", isLiveMode, "modelPath =", modelPath || activeModelPath);
     try {
         const targetModelPath = modelPath || activeModelPath;
         const { session, isV2, inputShape, inputName } = await loadSession(targetModelPath);
@@ -419,9 +418,7 @@ async function inferAudio(audioData, resultElement, isLiveMode = false, modelPat
         const feeds = {};
         feeds[inputName] = inputTensor;
         
-        console.log("[DEBUG] session.run about to execute");
         const results = await session.run(feeds);
-        console.log("[DEBUG] session.run completed successfully");
         const outputName = session.outputNames[0];
         const logits = results[outputName].data;
         
@@ -1043,7 +1040,6 @@ async function startLive() {
     
     function scheduleNextInference() {
         if (!isLive) return;
-        console.log("[DEBUG] scheduleNextInference scheduled with interval:", currentInterval);
         liveTimeout = setTimeout(() => {
             const bufferSize = circularBuffer.length;
             let samples = new Float32Array(bufferSize);
@@ -1054,15 +1050,12 @@ async function startLive() {
             // Resample native buffer to 16000 samples
             const resampledSamples = resampleBuffer(samples, audioContext.sampleRate, SAMPLE_RATE);
             
-            console.log("[DEBUG] scheduleNextInference: calling inferAudio");
             if (window.disableInferenceInLive) {
-                console.log("[DEBUG] scheduleNextInference: inference is disabled (mic only test)");
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
                 return;
             }
             inferAudio(resampledSamples, resultLive, true).then(() => {
-                console.log("[DEBUG] scheduleNextInference: inferAudio resolved successfully");
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
             }).catch((err) => {
