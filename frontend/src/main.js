@@ -4,7 +4,12 @@ import * as ort from 'onnxruntime-web';
 import { preprocessMelSpectrogram, preprocessMfcc } from './dsp.js';
 
 const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-ort.env.wasm.wasmPaths = basePath + 'wasm/';
+ort.env.wasm.wasmPaths = {
+    'ort-wasm-simd-threaded.wasm': basePath + 'wasm/ort-wasm-simd-threaded.wasm',
+    'ort-wasm-simd-threaded.mjs': basePath + 'wasm/ort-wasm-simd-threaded.mjs',
+    'ort-wasm-simd-threaded.jsep.wasm': basePath + 'wasm/ort-wasm-simd-threaded.wasm',
+    'ort-wasm-simd-threaded.jsep.mjs': basePath + 'wasm/ort-wasm-simd-threaded.mjs'
+};
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.proxy = !window.Capacitor;
 
@@ -671,9 +676,14 @@ async function initAudio() {
     }
     
     // Populate mic dropdown labels once permission is granted
-    if (micSelect && (micSelect.options.length <= 1 || (micSelect.options[0] && micSelect.options[0].label === ''))) {
+    const hasPlaceholders = micSelect ? Array.from(micSelect.options).some(opt => opt.textContent.startsWith('Microphone ')) : false;
+    if (micSelect && (micSelect.options.length <= 1 || hasPlaceholders)) {
         await populateMicSelect();
-        if (selectedDeviceId !== 'default') {
+        const tracks = mediaStream.getAudioTracks();
+        const activeTrackDeviceId = (tracks.length > 0 && tracks[0].getSettings) ? tracks[0].getSettings().deviceId : null;
+        if (activeTrackDeviceId && Array.from(micSelect.options).some(opt => opt.value === activeTrackDeviceId)) {
+            micSelect.value = activeTrackDeviceId;
+        } else if (selectedDeviceId && selectedDeviceId !== 'default' && selectedDeviceId !== 'loading') {
             micSelect.value = selectedDeviceId;
         }
     }

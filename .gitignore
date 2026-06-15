@@ -28,6 +28,8 @@ env/
 *.zip
 
 !frontend/package.json
+!frontend/public/config.json
+!frontend/capacitor.config.json
 Utils/PyTorch_wronglist.txt
 
 *build/
