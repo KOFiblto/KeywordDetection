@@ -88,13 +88,15 @@ jobs:
           cd frontend/ios/App
           xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -destination 'generic/platform=iOS' clean build SYMROOT=build
 
-      - name: Compress iOS Build
+      - name: Package iOS IPA (Unsigned)
         run: |
           cd frontend/ios/App/build/Debug-iphoneos
-          zip -r ../../../../Auditory-AI-iOS-Unsigned.zip App.app
+          mkdir Payload
+          cp -r App.app Payload/
+          zip -r ../../../../Auditory-AI-iOS-Unsigned.ipa Payload
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Auditory-AI-iOS-Unsigned
-          path: frontend/Auditory-AI-iOS-Unsigned.zip
+          name: Auditory-AI-iOS-Unsigned-IPA
+          path: Auditory-AI-iOS-Unsigned.ipa
