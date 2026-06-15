@@ -32,7 +32,9 @@ async function loadSession(modelPath) {
         const filename = modelPath.split(/[\\/]/).pop();
         const url = `./Models/${filename}`;
         console.log(`Loading ONNX model from: ${url}`);
-        session = await ort.InferenceSession.create(url);
+        session = await ort.InferenceSession.create(url, {
+            executionProviders: ['wasm']
+        });
         name = filename;
     }
     
@@ -556,7 +558,9 @@ if (window.electronAPI) {
             
             try {
                 console.log(`Loading custom model client-side: ${name}`);
-                const session = await ort.InferenceSession.create(buffer);
+                const session = await ort.InferenceSession.create(buffer, {
+                    executionProviders: ['wasm']
+                });
                 
                 const inputNames = session.inputNames;
                 const inputShape = (session.inputMetadata && session.inputMetadata[0]) ? session.inputMetadata[0].shape : [];
