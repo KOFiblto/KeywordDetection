@@ -1,5 +1,71 @@
 // DSP implementation matching PyTorch/torchaudio MFCC & MelSpectrogram exactly.
 
+let twiddleCache = {};
+function getTwiddleFactors(nFft) {
+    if (twiddleCache[nFft]) {
+        return twiddleCache[nFft];
+    }
+    const halfN = Math.floor(nFft / 2) + 1;
+    const cosTable = new Float32Array(halfN * nFft);
+    const sinTable = new Float32Array(halfN * nFft);
+    const angleStep = (2 * Math.PI) / nFft;
+    
+    for (let k = 0; k < halfN; k++) {
+        const angleK = k * angleStep;
+        const offset = k * nFft;
+        for (let n = 0; n < nFft; n++) {
+            const angle = n * angleK;
+            cosTable[offset + n] = Math.cos(angle);
+            sinTable[offset + n] = Math.sin(angle);
+        }
+    }
+    
+    const factors = { cosTable, sinTable };
+    twiddleCache[nFft] = factors;
+    return factors;
+}
+
+let windowCache = {};
+function getWindow(nFft) {
+    if (windowCache[nFft]) {
+        return windowCache[nFft];
+    }
+    const window = new Float32Array(nFft);
+    for (let i = 0; i < nFft; i++) {
+        window[i] = Math.pow(Math.sin((Math.PI * i) / nFft), 2);
+    }
+    windowCache[nFft] = window;
+    return window;
+}
+
+let dctCache = {};
+function getDctTable(rows) {
+    if (dctCache[rows]) {
+        return dctCache[rows];
+    }
+    const table = new Float32Array(rows * rows);
+    for (let k = 0; k < rows; k++) {
+        const angleScale = (Math.PI * k) / (2.0 * rows);
+        const offset = k * rows;
+        for (let n = 0; n < rows; n++) {
+            table[offset + n] = Math.cos(angleScale * (2 * n + 1));
+        }
+    }
+    dctCache[rows] = table;
+    return table;
+}
+
+let filterbankCache = {};
+function getMelFilterbank(nFreqs, fMin, fMax, nMels, sampleRate, norm = null, melScale = 'htk') {
+    const key = `${nFreqs}_${fMin}_${fMax}_${nMels}_${sampleRate}_${norm}_${melScale}`;
+    if (filterbankCache[key]) {
+        return filterbankCache[key];
+    }
+    const fb = createMelFilterbank(nFreqs, fMin, fMax, nMels, sampleRate, norm, melScale);
+    filterbankCache[key] = fb;
+    return fb;
+}
+
 function hzToMel(freq, melScale = 'htk') {
     if (melScale === 'htk') {
         return 2595.0 * Math.log10(1.0 + (freq / 700.0));
@@ -71,32 +137,25 @@ function createMelFilterbank(nFreqs, fMin, fMax, nMels, sampleRate, norm = null,
     return fb;
 }
 
-function dft(frame, nFft) {
+function dftPowerInPlace(frame, nFft, spectrogram, f, nFrames) {
     const halfN = Math.floor(nFft / 2) + 1;
-    const realOut = new Float32Array(halfN);
-    const imagOut = new Float32Array(halfN);
-    const angleStep = (2 * Math.PI) / nFft;
+    const { cosTable, sinTable } = getTwiddleFactors(nFft);
     
     for (let k = 0; k < halfN; k++) {
         let sumReal = 0;
         let sumImag = 0;
-        const angleK = k * angleStep;
+        const offset = k * nFft;
         for (let n = 0; n < frame.length; n++) {
-            const angle = n * angleK;
-            sumReal += frame[n] * Math.cos(angle);
-            sumImag += -frame[n] * Math.sin(angle);
+            const val = frame[n];
+            sumReal += val * cosTable[offset + n];
+            sumImag -= val * sinTable[offset + n];
         }
-        realOut[k] = sumReal;
-        imagOut[k] = sumImag;
+        spectrogram[k * nFrames + f] = sumReal * sumReal + sumImag * sumImag;
     }
-    return { real: realOut, imag: imagOut };
 }
 
 function stft(x, nFft, hopLength) {
-    const window = new Float32Array(nFft);
-    for (let i = 0; i < nFft; i++) {
-        window[i] = Math.pow(Math.sin((Math.PI * i) / nFft), 2);
-    }
+    const window = getWindow(nFft);
 
     const padLen = Math.floor(nFft / 2);
     const padded = new Float32Array(x.length + 2 * padLen);
@@ -122,10 +181,7 @@ function stft(x, nFft, hopLength) {
         for (let i = 0; i < nFft; i++) {
             frame[i] = padded[start + i] * window[i];
         }
-        const { real, imag } = dft(frame, nFft);
-        for (let k = 0; k < halfN; k++) {
-            spectrogram[k * nFrames + f] = real[k] * real[k] + imag[k] * imag[k];
-        }
+        dftPowerInPlace(frame, nFft, spectrogram, f, nFrames);
     }
 
     return { data: spectrogram, rows: halfN, cols: nFrames };
@@ -135,15 +191,16 @@ function computeDct2(melSpec, rows, cols) {
     const dct = new Float32Array(rows * cols);
     const factor0 = 0.5 * Math.sqrt(1.0 / rows);
     const factor1 = 0.5 * Math.sqrt(2.0 / rows);
+    const dctTable = getDctTable(rows);
 
     for (let k = 0; k < rows; k++) {
         const scale = (k === 0) ? factor0 : factor1;
-        const angleScale = (Math.PI * k) / (2.0 * rows);
+        const offset = k * rows;
         
         for (let c = 0; c < cols; c++) {
             let sum = 0;
             for (let n = 0; n < rows; n++) {
-                sum += melSpec[n * cols + c] * Math.cos(angleScale * (2 * n + 1));
+                sum += melSpec[n * cols + c] * dctTable[offset + n];
             }
             dct[k * cols + c] = 2.0 * sum * scale;
         }
@@ -153,7 +210,7 @@ function computeDct2(melSpec, rows, cols) {
 
 export function preprocessMelSpectrogram(x, sampleRate, nFft = 400, hopLength = 160, nMels = 64) {
     const { data: power, rows: nFreqs, cols: nFrames } = stft(x, nFft, hopLength);
-    const fb = createMelFilterbank(nFreqs, 0.0, sampleRate / 2.0, nMels, sampleRate);
+    const fb = getMelFilterbank(nFreqs, 0.0, sampleRate / 2.0, nMels, sampleRate);
 
     const mel = new Float32Array(nMels * nFrames);
     for (let m = 0; m < nMels; m++) {
@@ -172,7 +229,7 @@ export function preprocessMfcc(x, sampleRate, nMfcc = 40, nMels = 64) {
     const nFft = 400;
     const hopLength = 200;
     const { data: power, rows: nFreqs, cols: nFrames } = stft(x, nFft, hopLength);
-    const fb = createMelFilterbank(nFreqs, 0.0, sampleRate / 2.0, nMels, sampleRate);
+    const fb = getMelFilterbank(nFreqs, 0.0, sampleRate / 2.0, nMels, sampleRate);
 
     const logMel = new Float32Array(nMels * nFrames);
     for (let m = 0; m < nMels; m++) {
