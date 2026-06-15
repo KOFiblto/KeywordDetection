@@ -330,6 +330,7 @@ async function setModel(path) {
 }
 
 async function inferAudio(audioData, resultElement, isLiveMode = false, modelPath = null, highlightCallback = null) {
+    console.log("[DEBUG] inferAudio called. isLiveMode =", isLiveMode, "modelPath =", modelPath || activeModelPath);
     try {
         const targetModelPath = modelPath || activeModelPath;
         const { session, isV2, inputShape, inputName } = await loadSession(targetModelPath);
@@ -404,7 +405,9 @@ async function inferAudio(audioData, resultElement, isLiveMode = false, modelPat
         const feeds = {};
         feeds[inputName] = inputTensor;
         
+        console.log("[DEBUG] session.run about to execute");
         const results = await session.run(feeds);
+        console.log("[DEBUG] session.run completed successfully");
         const outputName = session.outputNames[0];
         const logits = results[outputName].data;
         
@@ -452,6 +455,8 @@ async function populateMicSelect() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const audioDevices = devices.filter(device => device.kind === 'audioinput');
+        console.log("[DEBUG] populateMicSelect called. Devices count:", audioDevices.length);
+        console.log("[DEBUG] populateMicSelect devices list:", JSON.stringify(audioDevices.map(d => ({id: d.deviceId, label: d.label}))));
         
         const currentVal = micSelect.value;
         micSelect.innerHTML = '';
@@ -637,6 +642,7 @@ async function initAudio() {
     }
     
     const selectedDeviceId = micSelect ? micSelect.value : 'default';
+    console.log("[DEBUG] initAudio called. DeviceId selected:", selectedDeviceId);
     
     // Reuse existing stream if it's active and has the correct deviceId
     if (mediaStream && mediaStream.active) {
@@ -665,11 +671,15 @@ async function initAudio() {
     }
     
     try {
+        console.log("[DEBUG] getUserMedia called with constraints:", JSON.stringify(constraints));
         mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log("[DEBUG] getUserMedia succeeded. Stream active:", mediaStream.active);
     } catch (err) {
         if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
             console.warn("Requested microphone constraints failed, falling back to default microphone", err);
+            console.log("[DEBUG] falling back getUserMedia");
             mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            console.log("[DEBUG] fallback getUserMedia succeeded. Stream active:", mediaStream.active);
         } else {
             throw err;
         }
@@ -975,6 +985,7 @@ function syncVoiceUI() {
 }
 
 async function startLive() {
+    console.log("[DEBUG] startLive called");
     await initAudio();
     isLive = true;
     syncVoiceUI();
@@ -1008,16 +1019,20 @@ async function startLive() {
     
     function scheduleNextInference() {
         if (!isLive) return;
+        console.log("[DEBUG] scheduleNextInference scheduled with interval:", currentInterval);
         liveTimeout = setTimeout(() => {
             let samples = new Float32Array(BUFFER_SIZE);
             for (let i = 0; i < BUFFER_SIZE; i++) {
                 samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
             }
             
+            console.log("[DEBUG] scheduleNextInference: calling inferAudio");
             inferAudio(samples, resultLive, true).then(() => {
+                console.log("[DEBUG] scheduleNextInference: inferAudio resolved successfully");
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
-            }).catch(() => {
+            }).catch((err) => {
+                console.error("[DEBUG] scheduleNextInference: inferAudio failed:", err);
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
             });
