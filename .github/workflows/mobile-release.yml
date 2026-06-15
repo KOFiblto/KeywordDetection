@@ -83,6 +83,16 @@ jobs:
           cd frontend
           npx cap sync ios
 
+      - name: Package Xcode Project ZIP
+        run: |
+          zip -r Auditory-AI-Xcode-Project.zip frontend/ios
+
+      - name: Upload Xcode Project Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Auditory-AI-Xcode-Project
+          path: Auditory-AI-Xcode-Project.zip
+
       - name: Build iOS App (Unsigned)
         run: |
           cd frontend/ios/App
