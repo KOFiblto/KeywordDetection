@@ -1027,6 +1027,12 @@ async function startLive() {
             }
             
             console.log("[DEBUG] scheduleNextInference: calling inferAudio");
+            if (window.disableInferenceInLive) {
+                console.log("[DEBUG] scheduleNextInference: inference is disabled (mic only test)");
+                lastInferenceTime = Date.now();
+                scheduleNextInference();
+                return;
+            }
             inferAudio(samples, resultLive, true).then(() => {
                 console.log("[DEBUG] scheduleNextInference: inferAudio resolved successfully");
                 lastInferenceTime = Date.now();
@@ -1330,6 +1336,122 @@ if (aboutVersion && typeof __APP_VERSION__ !== 'undefined') {
 }
 if (aboutReleaseDate && typeof __RELEASE_DATE__ !== 'undefined') {
   aboutReleaseDate.textContent = __RELEASE_DATE__;
+}
+
+// --- Diagnostics Mode Implementation ---
+const diagBtnInference = document.getElementById('diag-btn-inference');
+const diagBtnMic = document.getElementById('diag-btn-mic');
+const diagResults = document.getElementById('diag-results');
+
+function logDiag(msg, isError = false) {
+    if (!diagResults) return;
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = isError ? '[ERROR]' : '[INFO]';
+    diagResults.textContent += `\n[${timestamp}] ${prefix} ${msg}`;
+    diagResults.scrollTop = diagResults.scrollHeight;
+    console.log(`[DIAG] ${msg}`);
+}
+
+let diagInferenceInterval = null;
+
+if (diagBtnInference) {
+    diagBtnInference.addEventListener('click', async () => {
+        if (diagInferenceInterval) {
+            clearInterval(diagInferenceInterval);
+            diagInferenceInterval = null;
+            diagBtnInference.textContent = 'Start Test';
+            diagBtnInference.classList.remove('danger');
+            logDiag("Model Inference Only test stopped.");
+            return;
+        }
+
+        // Stop other active tests / loops
+        if (isLive) stopLive();
+        if (isDualLive) stopDualLive();
+        if (diagBtnMic && diagBtnMic.classList.contains('active')) {
+            diagBtnMic.click();
+        }
+
+        logDiag("Starting Model Inference Only test...");
+        diagBtnInference.textContent = 'Stop Test';
+        diagBtnInference.classList.add('danger');
+
+        try {
+            logDiag(`Loading model: ${activeModelPath}...`);
+            await loadSession(activeModelPath);
+            logDiag("Model loaded successfully.");
+        } catch (e) {
+            logDiag(`Failed to load model: ${e.message}`, true);
+            diagBtnInference.textContent = 'Start Test';
+            diagBtnInference.classList.remove('danger');
+            diagInferenceInterval = null;
+            return;
+        }
+
+        const dummySamples = new Float32Array(16000); // Silent dummy data
+        const resultMock = {
+            set textContent(val) {
+                logDiag(`Inference Output: ${val}`);
+            },
+            get textContent() { return ''; },
+            classList: {
+                remove() {},
+                add() {}
+            }
+        };
+
+        logDiag("Inference loop starting (every 500ms)...");
+        diagInferenceInterval = setInterval(async () => {
+            logDiag("Triggering dummy session.run()...");
+            try {
+                await inferAudio(dummySamples, resultMock, false);
+                logDiag("dummy session.run() finished successfully.");
+            } catch (err) {
+                logDiag(`Inference call failed: ${err.message}`, true);
+            }
+        }, 500);
+    });
+}
+
+window.disableInferenceInLive = false;
+
+if (diagBtnMic) {
+    diagBtnMic.addEventListener('click', async () => {
+        if (diagBtnMic.classList.contains('active')) {
+            stopLive();
+            window.disableInferenceInLive = false;
+            diagBtnMic.textContent = 'Start Test';
+            diagBtnMic.classList.remove('active', 'danger');
+            logDiag("Audio/Mic Capture Only test stopped.");
+            return;
+        }
+
+        // Stop other active tests / loops
+        if (diagInferenceInterval) {
+            clearInterval(diagInferenceInterval);
+            diagInferenceInterval = null;
+            if (diagBtnInference) {
+                diagBtnInference.textContent = 'Start Test';
+                diagBtnInference.classList.remove('danger');
+            }
+        }
+
+        logDiag("Starting Audio/Mic Capture Only test...");
+        diagBtnMic.textContent = 'Stop Test';
+        diagBtnMic.classList.add('active', 'danger');
+        
+        window.disableInferenceInLive = true;
+        try {
+            logDiag("Initializing microphone stream...");
+            await startLive();
+            logDiag("Microphone active. Visualizers should be drawing.");
+        } catch (err) {
+            logDiag(`Microphone initialization failed: ${err.message}`, true);
+            diagBtnMic.textContent = 'Start Test';
+            diagBtnMic.classList.remove('active', 'danger');
+            window.disableInferenceInLive = false;
+        }
+    });
 }
 
 
