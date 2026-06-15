@@ -107,7 +107,7 @@ jobs:
           cd frontend/ios/App/build/Debug-iphoneos
           mkdir Payload
           cp -r App.app Payload/
-          zip -r ../../../../auditory-ai.ipa Payload
+          zip -r $GITHUB_WORKSPACE/auditory-ai.ipa Payload
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
