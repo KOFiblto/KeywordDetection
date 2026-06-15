@@ -169,9 +169,23 @@ let analyser = null;
 let animationId = null;
 
 const SAMPLE_RATE = 16000;
-const BUFFER_SIZE = SAMPLE_RATE * 1; // 1 second
-let circularBuffer = new Float32Array(BUFFER_SIZE);
+let circularBuffer = new Float32Array(SAMPLE_RATE); // will be reallocated in initAudio
 let bufferIndex = 0;
+
+function resampleBuffer(samples, fromRate, toRate) {
+    if (fromRate === toRate) return samples;
+    const ratio = toRate / fromRate;
+    const newLength = Math.round(samples.length * ratio);
+    const resampled = new Float32Array(newLength);
+    for (let i = 0; i < newLength; i++) {
+        const srcIdx = i / ratio;
+        const baseIdx = Math.floor(srcIdx);
+        const nextIdx = Math.min(baseIdx + 1, samples.length - 1);
+        const frac = srcIdx - baseIdx;
+        resampled[i] = samples[baseIdx] * (1.0 - frac) + samples[nextIdx] * frac;
+    }
+    return resampled;
+}
 
 // Setup Canvases
 function resizeCanvases() {
@@ -638,7 +652,16 @@ tabs.forEach(tab => {
 // --- Audio Capture Utils ---
 async function initAudio() {
     if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log("[DEBUG] AudioContext created with native sampleRate:", audioContext.sampleRate);
+    }
+    
+    // Reallocate circular buffer dynamically to hold 1 second of audio at native rate
+    const nativeSampleRate = audioContext.sampleRate;
+    if (circularBuffer.length !== nativeSampleRate) {
+        circularBuffer = new Float32Array(nativeSampleRate);
+        bufferIndex = 0;
+        console.log("[DEBUG] Reallocated circular buffer to native size:", nativeSampleRate);
     }
     
     const selectedDeviceId = micSelect ? micSelect.value : 'default';
@@ -999,9 +1022,10 @@ async function startLive() {
     scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
     scriptProcessor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
+        const bufferSize = circularBuffer.length;
         for (let i = 0; i < input.length; i++) {
             circularBuffer[bufferIndex] = input[i];
-            bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
+            bufferIndex = (bufferIndex + 1) % bufferSize;
         }
     };
     source.connect(scriptProcessor);
@@ -1021,10 +1045,14 @@ async function startLive() {
         if (!isLive) return;
         console.log("[DEBUG] scheduleNextInference scheduled with interval:", currentInterval);
         liveTimeout = setTimeout(() => {
-            let samples = new Float32Array(BUFFER_SIZE);
-            for (let i = 0; i < BUFFER_SIZE; i++) {
-                samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
+            const bufferSize = circularBuffer.length;
+            let samples = new Float32Array(bufferSize);
+            for (let i = 0; i < bufferSize; i++) {
+                samples[i] = circularBuffer[(bufferIndex + i) % bufferSize];
             }
+            
+            // Resample native buffer to 16000 samples
+            const resampledSamples = resampleBuffer(samples, audioContext.sampleRate, SAMPLE_RATE);
             
             console.log("[DEBUG] scheduleNextInference: calling inferAudio");
             if (window.disableInferenceInLive) {
@@ -1033,7 +1061,7 @@ async function startLive() {
                 scheduleNextInference();
                 return;
             }
-            inferAudio(samples, resultLive, true).then(() => {
+            inferAudio(resampledSamples, resultLive, true).then(() => {
                 console.log("[DEBUG] scheduleNextInference: inferAudio resolved successfully");
                 lastInferenceTime = Date.now();
                 scheduleNextInference();
@@ -1232,9 +1260,10 @@ async function startDualLive() {
     scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
     scriptProcessor.onaudioprocess = (e) => {
         const input = e.inputBuffer.getChannelData(0);
+        const bufferSize = circularBuffer.length;
         for (let i = 0; i < input.length; i++) {
             circularBuffer[bufferIndex] = input[i];
-            bufferIndex = (bufferIndex + 1) % BUFFER_SIZE;
+            bufferIndex = (bufferIndex + 1) % bufferSize;
         }
     };
     source.connect(scriptProcessor);
@@ -1254,17 +1283,21 @@ async function startDualLive() {
     function scheduleNextInferenceDual() {
         if (!isDualLive) return;
         dualLiveTimeout = setTimeout(() => {
-            let samples = new Float32Array(BUFFER_SIZE);
-            for (let i = 0; i < BUFFER_SIZE; i++) {
-                samples[i] = circularBuffer[(bufferIndex + i) % BUFFER_SIZE];
+            const bufferSize = circularBuffer.length;
+            let samples = new Float32Array(bufferSize);
+            for (let i = 0; i < bufferSize; i++) {
+                samples[i] = circularBuffer[(bufferIndex + i) % bufferSize];
             }
+            
+            // Resample native buffer to 16000 samples
+            const resampledSamples = resampleBuffer(samples, audioContext.sampleRate, SAMPLE_RATE);
             
             const modelA = modelSelectA ? modelSelectA.value : '';
             const modelB = modelSelectB ? modelSelectB.value : '';
             
             Promise.all([
-                inferAudio(samples, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
-                inferAudio(samples, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
+                inferAudio(resampledSamples, resultDualA, true, modelA, (keyword) => drawHighlightDual('A', keyword)),
+                inferAudio(resampledSamples, resultDualB, true, modelB, (keyword) => drawHighlightDual('B', keyword))
             ]).then(() => {
                 lastInferenceTimeDual = Date.now();
                 scheduleNextInferenceDual();
