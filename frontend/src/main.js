@@ -628,6 +628,21 @@ async function initAudio() {
     }
     
     const selectedDeviceId = micSelect ? micSelect.value : 'default';
+    
+    // Reuse existing stream if it's active and has the correct deviceId
+    if (mediaStream && mediaStream.active) {
+        const tracks = mediaStream.getAudioTracks();
+        if (tracks.length > 0 && tracks[0].readyState === 'live') {
+            const settings = tracks[0].getSettings ? tracks[0].getSettings() : {};
+            if (selectedDeviceId === 'default' || !selectedDeviceId || settings.deviceId === selectedDeviceId) {
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                return;
+            }
+        }
+    }
+    
     const constraints = {
         audio: (selectedDeviceId === 'default' || !selectedDeviceId || selectedDeviceId === 'loading') 
             ? true 
@@ -635,7 +650,7 @@ async function initAudio() {
         video: false
     };
     
-    // Stop previous track if any
+    // Stop previous track if any since we are switching to a new device or stream
     if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
     }
