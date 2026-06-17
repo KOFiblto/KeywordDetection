@@ -3,15 +3,12 @@ import json
 import io
 import wave
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchaudio
 import onnxruntime as ort
 import soundfile as sf
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import sys
 
 app = FastAPI()
 
@@ -23,8 +20,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load config
-CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "config.json"))
+# Base directory logic to support pyinstaller and dev
+if getattr(sys, 'frozen', False):
+    exe_dir = os.path.dirname(sys.executable)
+    base_dir = exe_dir
+    for _ in range(5):
+        if os.path.exists(os.path.join(base_dir, "config.json")):
+            break
+        base_dir = os.path.dirname(base_dir)
+    BASE_DIR = os.path.abspath(base_dir)
+else:
+    BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 try:
     with open(CONFIG_PATH, "r") as f:
         config_data = json.load(f)
@@ -37,39 +45,85 @@ except Exception as e:
     TARGET_SAMPLE_RATE = 16000
     NUM_SAMPLES = 16000
 
-# Device
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ----------------- Pure NumPy Preprocessing -----------------
+def numpy_hz_to_mel(freq, mel_scale='htk'):
+    if mel_scale == 'htk':
+        return 2595.0 * np.log10(1.0 + (freq / 700.0))
+    if freq < 1000.0:
+        return freq * 3.0 / 200.0
+    return 15.0 + np.log(freq / 1000.0) / (np.log(6.4) / 27.0)
 
-# MFCC Transform exactly like PyTorch.ipynb
-mfcc_transform = torchaudio.transforms.MFCC(
-    sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
-).to(DEVICE)
+def numpy_mel_to_hz(mels, mel_scale='htk'):
+    if mel_scale == 'htk':
+        return 700.0 * (10.0 ** (mels / 2595.0) - 1.0)
+    freqs = mels * 200.0 / 3.0
+    min_log_mel = 15.0
+    log_t = mels >= min_log_mel
+    freqs[log_t] = 1000.0 * np.exp((mels[log_t] - min_log_mel) * (np.log(6.4) / 27.0))
+    return freqs
 
-# Models are loaded and run using ONNX Runtime directly.
+def numpy_melscale_fbanks(n_freqs, f_min, f_max, n_mels, sample_rate, norm=None, mel_scale='htk'):
+    all_freqs = np.linspace(0, sample_rate / 2, n_freqs)
+    m_min = numpy_hz_to_mel(f_min, mel_scale)
+    m_max = numpy_hz_to_mel(f_max, mel_scale)
+    m_pts = np.linspace(m_min, m_max, n_mels + 2)
+    f_pts = numpy_mel_to_hz(m_pts, mel_scale)
+    f_diff = f_pts[1:] - f_pts[:-1]
+    slopes = f_pts[None, :] - all_freqs[:, None]
+    down_slopes = (-1.0 * slopes[:, :-2]) / f_diff[:-1]
+    up_slopes = slopes[:, 2:] / f_diff[1:]
+    fb = np.maximum(0.0, np.minimum(down_slopes, up_slopes))
+    if norm == 'slaney':
+        enorm = 2.0 / (f_pts[2 : n_mels + 2] - f_pts[:n_mels])
+        fb *= enorm[None, :]
+    return fb
 
-# Log-Mel Spectrogram for PyTorch2 models
-class LogMelSpectrogram(nn.Module):
-    def __init__(self, sample_rate, n_fft=400, hop_length=160, n_mels=64):
-        super().__init__()
-        self.mel = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            hop_length=hop_length,
-            n_mels=n_mels
-        )
+def numpy_stft(x, n_fft, hop_length):
+    n = np.arange(n_fft)
+    window = np.sin(np.pi * n / n_fft) ** 2
+    pad_len = n_fft // 2
+    x_padded = np.pad(x, pad_len, mode='reflect')
+    n_frames = 1 + (len(x_padded) - n_fft) // hop_length
+    stft_matrix = np.empty((n_fft // 2 + 1, n_frames), dtype=np.complex64)
+    for i in range(n_frames):
+        start = i * hop_length
+        frame = x_padded[start:start + n_fft] * window
+        stft_matrix[:, i] = np.fft.rfft(frame, n_fft)
+    return stft_matrix
 
-    def forward(self, x):
-        x = self.mel(x)
-        return torch.log(x + 1e-6)
+def compute_dct_ii(x):
+    N = x.shape[0]
+    n = np.arange(N)
+    k = np.arange(N)[:, None]
+    cos_matrix = np.cos(np.pi * k * (2 * n + 1) / (2 * N))
+    y = 2.0 * np.dot(cos_matrix, x)
+    y[0] *= 0.5 * np.sqrt(1.0 / N)
+    y[1:] *= 0.5 * np.sqrt(2.0 / N)
+    return y
+
+def preprocess_mel_spectrogram(waveform_np, sample_rate, n_fft=400, hop_length=160, n_mels=64):
+    stft = numpy_stft(waveform_np, n_fft, hop_length)
+    power = np.abs(stft) ** 2
+    fb = numpy_melscale_fbanks(n_fft // 2 + 1, 0.0, sample_rate / 2.0, n_mels, sample_rate)
+    mel = np.dot(fb.T, power)
+    return np.log(mel + 1e-6)
+
+def preprocess_mfcc(waveform_np, sample_rate, n_mfcc=40, n_mels=64):
+    stft = numpy_stft(waveform_np, n_fft=400, hop_length=200)
+    power = np.abs(stft) ** 2
+    fb = numpy_melscale_fbanks(201, 0.0, sample_rate / 2.0, n_mels, sample_rate)
+    mel = np.dot(fb.T, power)
+    log_mel = 10.0 * np.log10(np.maximum(mel, 1e-10))
+    mfcc = compute_dct_ii(log_mel)[:n_mfcc]
+    return mfcc
 
 # State
-# Cache for loaded models: {path: {"session": session, "transform": transform}}
 model_cache = {}
 
 def get_or_load_model(path: str):
     path = os.path.abspath(path)
     if path in model_cache:
-        return model_cache[path]["session"], model_cache[path]["transform"]
+        return model_cache[path]["session"], model_cache[path]["is_v2"]
         
     if not os.path.exists(path):
         raise FileNotFoundError(f"Model file not found: {path}")
@@ -77,16 +131,13 @@ def get_or_load_model(path: str):
     is_v2 = False
     
     if path.endswith(".onnx"):
-        # providers options, use CUDA if available
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if torch.cuda.is_available() else ['CPUExecutionProvider']
+        available_providers = ort.get_available_providers()
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if 'CUDAExecutionProvider' in available_providers else ['CPUExecutionProvider']
         session = ort.InferenceSession(path, providers=providers)
         
         # Check expected input shape to dynamically identify version
         input_shape = session.get_inputs()[0].shape
         
-        # Determine features dimension based on channel layout
-        # PyTorch format: [batch, channel, features, time] -> features is at index 2
-        # TensorFlow format: [batch, features, time, channel] -> features is at index 1
         features_dim = 40
         if len(input_shape) == 4:
             if input_shape[3] == 1 or input_shape[3] == '1':
@@ -101,35 +152,24 @@ def get_or_load_model(path: str):
     else:
         raise ValueError("Unsupported model extension. Only self-sustaining .onnx models are supported.")
         
-    # Instantiate and select correct transform
-    if is_v2:
-        transform = LogMelSpectrogram(
-            sample_rate=TARGET_SAMPLE_RATE, n_fft=400, hop_length=160, n_mels=64
-        ).to(DEVICE)
-        print(f"Using LogMelSpectrogram (v2) transform for {path}.")
-    else:
-        transform = torchaudio.transforms.MFCC(
-            sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, melkwargs={"n_mels": 64}
-        ).to(DEVICE)
-        print(f"Using MFCC (v1) transform for {path}.")
-        
-    model_cache[path] = {"session": session, "transform": transform}
-    return session, transform
+    model_cache[path] = {"session": session, "is_v2": is_v2}
+    return session, is_v2
 
 # State
-current_model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "PyTorch", "Models", "PyTorch.onnx"))
+current_model_path = os.path.abspath(os.path.join(BASE_DIR, "PyTorch", "Models", "PyTorch.onnx"))
 current_model_type = "onnx"
 ort_session = None
+is_v2_model = False
 
 def load_model(path: str):
-    global current_model_path, current_model_type, ort_session, mfcc_transform
+    global current_model_path, current_model_type, ort_session, is_v2_model
     path = os.path.abspath(path)
-    session, transform = get_or_load_model(path)
+    session, is_v2 = get_or_load_model(path)
     ort_session = session
-    mfcc_transform = transform
+    is_v2_model = is_v2
     current_model_path = path
     current_model_type = "onnx"
-    print(f"Loaded active model: {path}")
+    print(f"Loaded active model: {path} (is_v2: {is_v2})")
 
 # Initial load
 try:
@@ -150,9 +190,8 @@ def set_model(req: SetModelRequest):
 
 @app.get("/models")
 def get_models():
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    pytorch_models_dir = os.path.join(base_dir, "PyTorch", "Models")
-    tensorflow_models_dir = os.path.join(base_dir, "TensorFlow", "Models")
+    pytorch_models_dir = os.path.join(BASE_DIR, "PyTorch", "Models")
+    tensorflow_models_dir = os.path.join(BASE_DIR, "Tensorflow", "Models")
     
     models = []
     
@@ -162,16 +201,13 @@ def get_models():
             if f.endswith(".onnx"):
                 models.append(os.path.join(pytorch_models_dir, f))
                 
-    # scan TensorFlow/Models
+    # scan Tensorflow/Models
     if os.path.exists(tensorflow_models_dir):
         for f in os.listdir(tensorflow_models_dir):
             if f.endswith(".onnx"):
                 models.append(os.path.join(tensorflow_models_dir, f))
                 
-    # sort models to make order consistent/clean
     models.sort(key=lambda x: os.path.basename(x))
-    
-    # filter out non-existent
     existing = [m for m in models if os.path.exists(m)]
     return {"available_models": existing, "current_model": current_model_path}
 
@@ -181,63 +217,59 @@ async def infer(audio: UploadFile = File(...), model_path: str = Form(None)):
     
     try:
         if model_path:
-            session, transform = get_or_load_model(model_path)
+            session, is_v2 = get_or_load_model(model_path)
         else:
             if not ort_session:
                 raise HTTPException(status_code=500, detail="No model loaded")
-            session, transform = ort_session, mfcc_transform
+            session, is_v2 = ort_session, is_v2_model
 
         waveform_np, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
-        waveform = torch.from_numpy(waveform_np)
         
-        # Ensure correct channel dimension [1, time]
-        if waveform.ndim == 1:
-            waveform = waveform.unsqueeze(0)
-        else:
-            waveform = waveform.t()
-
-        # Convert stereo to mono by averaging channels
-        if waveform.shape[0] > 1:
-            waveform = torch.mean(waveform, dim=0, keepdim=True)
+        # Ensure correct channel dimension [time] (mono conversion)
+        if waveform_np.ndim > 1:
+            waveform_np = np.mean(waveform_np, axis=1)
             
-        # Resample if needed
+        # Resample if needed using linear interpolation
         if sr != TARGET_SAMPLE_RATE:
-            resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=TARGET_SAMPLE_RATE)
-            waveform = resampler(waveform)
+            num_samples = int(len(waveform_np) * TARGET_SAMPLE_RATE / sr)
+            x_old = np.linspace(0, len(waveform_np) - 1, len(waveform_np))
+            x_new = np.linspace(0, len(waveform_np) - 1, num_samples)
+            waveform_np = np.interp(x_new, x_old, waveform_np).astype(np.float32)
 
         # Truncate or pad to exactly NUM_SAMPLES
-        if waveform.shape[1] > NUM_SAMPLES:
-            start = (waveform.shape[1] - NUM_SAMPLES) // 2
-            waveform = waveform[:, start:start + NUM_SAMPLES]
-        elif waveform.shape[1] < NUM_SAMPLES:
-            waveform = F.pad(waveform, (0, NUM_SAMPLES - waveform.shape[1]))
+        if len(waveform_np) > NUM_SAMPLES:
+            start = (len(waveform_np) - NUM_SAMPLES) // 2
+            waveform_np = waveform_np[start:start + NUM_SAMPLES]
+        elif len(waveform_np) < NUM_SAMPLES:
+            waveform_np = np.pad(waveform_np, (0, NUM_SAMPLES - len(waveform_np)), mode='constant')
 
-        # Add batch dim -> [1, 1, 16000]
-        waveform = waveform.unsqueeze(0).to(DEVICE)
-        
-        # Compute MFCC -> [1, 1, 40, 81] or [1, 1, 64, 101]
-        with torch.no_grad():
-            mfcc = transform(waveform)
+        # Compute preprocessed features
+        if is_v2:
+            features = preprocess_mel_spectrogram(
+                waveform_np, sample_rate=TARGET_SAMPLE_RATE, n_fft=400, hop_length=160, n_mels=64
+            )
+        else:
+            features = preprocess_mfcc(
+                waveform_np, sample_rate=TARGET_SAMPLE_RATE, n_mfcc=40, n_mels=64
+            )
 
-        # Run ONNX inference
-        mfcc_np = mfcc.cpu().numpy()
+        # Add batch and channel dimensions: shape will be [1, 1, height, width]
+        features_np = features[np.newaxis, np.newaxis, :, :].astype(np.float32)
         
         # Check expected input shape from ONNX model
         input_details = session.get_inputs()[0]
         expected_shape = input_details.shape
         
-        # Adjust mfcc_np shape to match expected_shape dimensions dynamically
-        # Normally mfcc_np is [batch, channel, height, width] e.g. [1, 1, 40, 81] or [1, 1, 64, 101]
+        # Adjust features_np shape to match expected_shape dimensions dynamically
         if len(expected_shape) == 4:
-            # If the last dimension is 1 or '1' (representing channel-last format like TensorFlow [batch, height, width, channels])
             if expected_shape[3] == 1 or expected_shape[3] == '1':
                 # Transpose from [batch, channel, height, width] to [batch, height, width, channel]
-                mfcc_np = mfcc_np.transpose(0, 2, 3, 1)
+                features_np = features_np.transpose(0, 2, 3, 1)
         elif len(expected_shape) == 3:
             # Squeeze channel dimension if model expects 3D input [batch, height, width]
-            mfcc_np = mfcc_np.squeeze(1)
+            features_np = features_np.squeeze(1)
 
-        ort_inputs = {input_details.name: mfcc_np}
+        ort_inputs = {input_details.name: features_np}
         logits = session.run(None, ort_inputs)[0]
         predicted_idx = np.argmax(logits, axis=1)[0]
 
@@ -259,4 +291,5 @@ async def infer(audio: UploadFile = File(...), model_path: str = Form(None)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=18000)
+    uvicorn.run(app, host="0.0.0.0", port=18000)
+

@@ -25,7 +25,10 @@ The complete project documentation, installation instructions, system architectu
 
 ---
 
-## Project Structure
+<details>
+<summary>Project Structure</summary>
+
+Here is the visual structure of the project, focusing on the machine learning models and dataset:
 
 ```text
 .

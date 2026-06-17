@@ -1,0 +1,154 @@
+name: Build Mobile Apps (APK & iOS)
+
+on:
+  push:
+    branches:
+      - Frontend
+      - main
+      - feature/js-inference
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd frontend
+          npm install --no-audit --no-fund
+
+      - name: Build Web App
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Capacitor Sync
+        run: |
+          cd frontend
+          npx cap sync android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'zulu'
+
+      - name: Build Android APK
+        run: |
+          cd frontend/android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK file
+        run: |
+          mv frontend/android/app/build/outputs/apk/debug/app-debug.apk frontend/android/app/build/outputs/apk/debug/auditory-ai.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditory-ai.apk
+          path: frontend/android/app/build/outputs/apk/debug/auditory-ai.apk
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: |
+          cd frontend
+          npm install --no-audit --no-fund
+
+      - name: Build Web App
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Capacitor Sync
+        run: |
+          cd frontend
+          npx cap sync ios
+
+      - name: Package Xcode Project ZIP
+        run: |
+          zip -r auditory-ai-xcode.zip frontend/ios
+
+      - name: Upload Xcode Project Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditory-ai-xcode.zip
+          path: auditory-ai-xcode.zip
+
+      - name: Build iOS App (Unsigned)
+        run: |
+          cd frontend/ios/App
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO -destination 'generic/platform=iOS' clean build SYMROOT=build
+
+      - name: Package iOS IPA (Unsigned)
+        run: |
+          cd frontend/ios/App/build/Debug-iphoneos
+          mkdir Payload
+          cp -r App.app Payload/
+          zip -r $GITHUB_WORKSPACE/auditory-ai.ipa Payload
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditory-ai.ipa
+          path: auditory-ai.ipa
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-android, build-ios]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or Update Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd release-assets
+          
+          # Delete existing 'latest' release and its tag if it exists, to keep assets clean
+          if gh release view latest >/dev/null 2>&1; then
+            echo "Release 'latest' exists. Recreating it to keep assets clean..."
+            gh release delete latest --yes --cleanup-tag || true
+            sleep 2
+          fi
+          
+          echo "Creating 'latest' release with the new assets..."
+          gh release create latest \
+            auditory-ai.apk \
+            auditory-ai.ipa \
+            auditory-ai-xcode.zip \
+            --title "Latest Development Build" \
+            --notes "Automated build of the latest commit on branch **${{ github.ref_name }}** (commit: ${{ github.sha }}). Updated on $(date -u +'%Y-%m-%d %H:%M:%S UTC')." \
+            --prerelease \
+            --target ${{ github.sha }}
