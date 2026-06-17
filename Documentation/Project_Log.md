@@ -29,11 +29,11 @@ This document provides a chronological overview of the development phases, assoc
 | `16fba2f` | Dominik Praja | **Cleaned "Down" Directory** | • Cleaned the `down` keyword audio folder. |
 | `aa7822f` | Dominik Praja | **Directory Clean-up & Organization** | • Re-organized directory structure to ensure balanced classes. |
 | `6b7c505, 8f67e95` | Mathias Kornschober | **Dataset Imbalance & RAM-Caching** | • Balanced classes to 10k negatives and 8k keywords, and implemented RAM caching in PyTorch. |
-| `f285a57` | Mathias Kornschober | **PyTorch ONNX Export** | • Serialized PyTorch weights to ONNX format, reducing CPU latency to under 5 ms. |
+| `f285a57` | Mathias Kornschober | **PyTorch ONNX Export** | • Converted the PyTorch model to ONNX format, allowing fast local CPU predictions in less than 5 ms without installing PyTorch. |
 | `7ae26e2` | Mathias Kornschober | **Electron UI & Waveforms** | • Created an Electron app shell using Vite to render 60 FPS real-time Canvas waveforms. |
 | `8f67e95` | Mathias Kornschober | **PyTorch Stratified Splitting** | • Refactored dataset splits to guarantee zero validation leakage between training folds. |
-| `db035fa` | Mathias Kornschober | **Post-Inference VAD Gate** | • Integrated energy-based RMS filters to bypass input signals below $0.002$. |
-| `188f706` | Mathias Kornschober | **Confidence Threshold Gate** | • Added a confidence threshold requiring softmax probabilities $>0.85$ to drop ambient noise false alarms. |
+| `db035fa` | Mathias Kornschober | **Post-Inference VAD Gate** | • Added a silence detector (VAD) that ignores quiet input signals (below 0.002) to prevent false triggers. |
+| `188f706` | Mathias Kornschober | **Confidence Threshold Gate** | • Configured the system to only trigger detections when the model is more than 85% sure, ignoring background noise. |
 | `cb0e16a, 950bc6e` | Dominik Praja | **TensorFlow Alignment & MFCC** | • Aligned Keras preprocessing to extract $(40, 81, 1)$ MFCC features to match PyTorch shapes. |
 | `359ad29, 0424c58` | Mathias Kornschober | **Dual Live Mode & JS Synthesizer** | • Integrated comparative real-time GUI inference and programmed a Web Audio synth. |
 | `d4fbbc4` | Mathias Kornschober | **Consolidated Services Script** | • Created `start-services.js` to concurrently spawn the FastAPI backend, Vite dev server, and Electron. |
@@ -44,8 +44,8 @@ This document provides a chronological overview of the development phases, assoc
 | `edf80e8, 793996d, 3f9d7f9` | Mathias Kornschober | **PyTorch Final Evaluation** | • Reported 98.52% PyTorch test accuracy and compiled the PyTorch final presentation slide deck. |
 | `9fd7095, aa6f963, 3cd9709` | Mathias Kornschober, Dominik Praja | **Model Evaluation & Presentation** | • Co-authored final model comparison presentations and TensorFlow slide deck. |
 | `f0424bb, 05a3038` | Mathias Kornschober | **Standalone Installers** | • Structured electron-builder configurations to compile standalone Windows application packages. |
-| `81dc40b` | Mathias Kornschober | **Client-Side WASM Setup** | • Migrated backend deep learning dependencies to browser-based WASM execution. |
-| `3b6ef32` | Mathias Kornschober | **DSP Performance Optimization** | • Optimized client-side STFT and DCT-II algorithms using cached twiddle tables. |
+| `81dc40b` | Mathias Kornschober | **Client-Side WASM Setup** | • Ran the neural network directly inside the web browser using WebAssembly (WASM), enabling local audio processing without a server. |
+| `3b6ef32` | Mathias Kornschober | **DSP Performance Optimization** | • Sped up real-time audio analysis (spectrogram calculation) in the browser using pre-calculated lookup tables to reduce CPU usage. |
 | `416acf4` | Mathias Kornschober | **Active MediaStream Re-use** | • Prevented duplicate mobile microphone permission requests by caching stream states. |
 | `32b03b2` | Mathias Kornschober | **Capacitor WebView Loop Fix** | • Forced runtime providers in capacitor context to bypass WebView restarts. |
 | `7032bc4, d9a01ed` | Mathias Kornschober | **CI/CD & iOS Deployment** | • Configured GitHub Actions pipelines to compile, package, and archive unsigned iOS application bundles. |
