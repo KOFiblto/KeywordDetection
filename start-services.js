@@ -16,16 +16,16 @@ function registerProcess(proc, name) {
   });
 }
 
-// 1. Spawn FastAPI Python backend
-console.log("[System] Starting Python Backend...");
-const backendPath = path.join(__dirname, 'backend');
-const pythonExec = path.join(__dirname, '.venv', 'Scripts', 'python.exe');
-const backend = spawn(pythonExec, ['main.py'], {
-  cwd: backendPath,
-  stdio: 'inherit',
-  shell: true
-});
-registerProcess(backend, "Backend");
+// 1. Spawn FastAPI Python backend (Disabled - client-side WASM inference active)
+// console.log("[System] Starting Python Backend...");
+// const backendPath = path.join(__dirname, 'backend');
+// const pythonExec = path.join(__dirname, '.venv', 'Scripts', 'python.exe');
+// const backend = spawn(pythonExec, ['main.py'], {
+//   cwd: backendPath,
+//   stdio: 'inherit',
+//   shell: true
+// });
+// registerProcess(backend, "Backend");
 
 // 2. Spawn Vite dev server
 console.log("[System] Starting Vite Dev Server...");

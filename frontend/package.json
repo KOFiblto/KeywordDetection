@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "main.cjs",
@@ -8,7 +8,8 @@
     "start": "concurrently \"vite\" \"wait-on tcp:5173 && electron .\"",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dist-app": "vite build && electron-builder"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -19,6 +20,45 @@
     "wait-on": "^9.0.10"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "onnxruntime-web": "^1.26.0",
     "wavesurfer.js": "^7.12.6"
+  },
+  "build": {
+    "compression": "store",
+    "appId": "com.keyword.detection",
+    "productName": "Auditory AI",
+    "directories": {
+      "output": "dist-app"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Auditory AI",
+      "useZip": true
+    },
+    "files": [
+      "dist/**/*",
+      "main.cjs",
+      "preload.cjs",
+      "package.json",
+      "splash.html",
+      "splash_logo.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../config.json",
+        "to": "config.json"
+      }
+    ]
   }
 }

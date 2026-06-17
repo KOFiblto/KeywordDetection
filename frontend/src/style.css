@@ -1059,11 +1059,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.85rem 1.25rem;
+    padding: calc(0.5rem + env(safe-area-inset-top)) 1.25rem 0.5rem 1.25rem;
     background: #030303;
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
-    height: 60px;
+    height: calc(60px + env(safe-area-inset-top));
+    box-sizing: border-box;
   }
   
   .sidebar-toggle-btn {
@@ -1102,6 +1103,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.7);
     width: 280px;
     height: 100%;
+    padding-top: calc(1.5rem + env(safe-area-inset-top));
+    box-sizing: border-box;
   }
   
   .sidebar.open {
@@ -1129,7 +1132,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   
   /* Main content mobile padding */
   .main-content {
-    padding: 1.25rem 1.25rem 6rem 1.25rem;
+    padding: 1.25rem 1.25rem calc(6rem + env(safe-area-inset-bottom)) 1.25rem;
     flex: 1 1 0%;
     min-height: 0;
     overflow-y: auto;

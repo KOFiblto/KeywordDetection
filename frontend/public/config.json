@@ -1,0 +1,12 @@
+{
+  "keywords": [
+    "yes",
+    "no",
+    "up",
+    "down",
+    "other"
+  ],
+  "target_sample_rate": 16000,
+  "num_samples": 16000,
+  "DATA_DIR": "dataset/"
+}
