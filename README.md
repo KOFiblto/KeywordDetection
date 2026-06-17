@@ -1,8 +1,27 @@
 # Keyword Detector
 
-A deep learning project designed to recognize specific spoken command keywords (**yes**, **no**, **up**, **down**) and filter out background noise or other words. This system provides high-performance models implemented in both **PyTorch** and **TensorFlow**, ready to compile, export, and use.
+A real-time deep learning speech recognition application that detects specific spoken commands (`yes`, `no`, `up`, `down`) and uses them to control interactive retro games (Voice Arcade) or perform model comparisons. 
 
-This repository contains isolated keyword spotters trained on the Google Speech Commands dataset. The models classify 1-second audio recordings into one of five classes: `yes`, `no`, `up`, `down`, and `other` (representing any other word or background noise). The project is optimized to reach over ~98.5% validation accuracy using Mel-Frequency Cepstral Coefficients (MFCC) feature extraction, audio data augmentation (time-shifting, noise injection), and SpecAugment (frequency and time masking). Both training pipelines export models directly to the ONNX format for efficient deployment.
+Optimized to over **98.5% validation accuracy** utilizing PyTorch, ONNX, Electron, and FastAPI.
+
+---
+
+## Repository Branches
+
+The repository is structured into the following branches to manage releases, development, and different framework implementations:
+
+* **`main`**: Contains stable releases.
+* **`develop`**: The primary development branch, branching off from `main`.
+* **`PyTorch`**: The PyTorch implementation of the keyword detector (including model training, optimization, and progressive test suites), branching off from `develop`.
+* **`TensorFlow`**: The TensorFlow/Keras implementation of the keyword detector, branching off from `develop`.
+
+---
+
+## Complete Documentation
+
+The complete project documentation, installation instructions, system architecture, project logs, and lessons learned are compiled in a single LaTeX document, alongside a standalone markdown development log:
+*   **[Documentation.tex](file:///c:/Users/nikna/Desktop/KeywordDetection/Documentation/Documentation.tex)**
+*   **[Project_Log.md](file:///c:/Users/nikna/Desktop/KeywordDetection/Documentation/Project_Log.md)**
 
 ---
 
@@ -13,80 +32,75 @@ Here is the visual structure of the project, focusing on the machine learning mo
 
 ```text
 .
-├── dataset/
-│   ├── yes/
-│   ├── no/
-│   ├── up/
-│   ├── down/
-│   └── other/
-├── install/
-│   ├── Download_Dataset.bat
-│   ├── install_requirements.bat
-│   └── pytorch/
-│       └── pytorch-requirements.txt
-├── PyTorch/
-│   ├── PyTorch.ipynb
-│   ├── Models/
-│   │   └── PyTorch.onnx
-│   └── Testing/
-├── TensorFlow/
-│   ├── tensorflow.ipynb
-│   └── Models/
-│       └── TensorFlow.onnx
-├── start.bat
-└── stop.bat
+├── config.json                     # Global configuration (classes, sample rates)
+├── start.bat                       # Launch script for both services (Frontend + Backend)
+├── stop.bat                        # Shutdown script to terminate running processes
+│
+├── PyTorch/                        # PyTorch model training and optimization
+│   ├── PyTorch.ipynb               # Model training & ONNX export notebook
+│   ├── Models/                     # Exported PyTorch ONNX model
+│   └── Testing/                    # Progressive test suites (01_specaugment to 11_combined_stable)
+│       └── Results/                # Training metrics & evaluation logs
+│
+├── TensorFlow/                     # TensorFlow/Keras alternate model implementations
+│   ├── tensorflow.ipynb            # Model training & ONNX export notebook
+│   └── Models/                     # Exported TensorFlow ONNX model
+│
+├── backend/                        # FastAPI REST API serving model inference via ONNX Runtime
+│   └── main.py                     # Main server entrypoint (Port 18000)
+│
+├── frontend/                       # Electron desktop application
+│   ├── index.html                  # Core HTML5 layout & Canvas viewports
+│   ├── main.cjs                    # Electron main controller process
+│   └── src/
+│       ├── main.js                 # Circular audio buffer capture & visualizer
+│       ├── games.js                # Retro Voice Arcade game engines (Flappy Bird, Space Defender, etc.)
+│       └── style.css               # Glassmorphic UI styling
+│
+├── install/                        # Dataset installers and guide
+│   ├── Download_Dataset.py         # Automatic Kaggle dataset fetcher & slicer
+│   └── pytorch/                    # Python environment requirements
+│
+└── Utils/                          # Helper scripts for dataset analysis and cleanup
+    ├── analyze_wavs.py             # Script to extract audio duration and sample statistics
+    └── dataset_statistics.txt      # Distribution statistics of audio files
 ```
 
-* **[PyTorch](file:///c:/_school/KeywordDetection/PyTorch)**: Contains the training notebook [PyTorch/PyTorch.ipynb](file:///c:/_school/KeywordDetection/PyTorch/PyTorch.ipynb), model exports in [PyTorch/Models](file:///c:/_school/KeywordDetection/PyTorch/Models), and progressive enhancement tests in [PyTorch/Testing](file:///c:/_school/KeywordDetection/PyTorch/Testing).
-* **[TensorFlow](file:///c:/_school/KeywordDetection/TensorFlow)**: Contains the training notebook [TensorFlow/tensorflow.ipynb](file:///c:/_school/KeywordDetection/TensorFlow/tensorflow.ipynb) and export binaries in [TensorFlow/Models](file:///c:/_school/KeywordDetection/TensorFlow/Models).
-* **[dataset](file:///c:/_school/KeywordDetection/dataset)**: The target directory where audio commands are structured after extraction.
-* **[install](file:///c:/_school/KeywordDetection/install)**: Shell scripts and dependency definitions.
-</details>
+---
 
-<details>
-<summary>Installation and Setup</summary>
+## Quick Start
 
-### 1. Install Dependencies
-Run the install batch script to set up Python packages like PyTorch, torchaudio, scikit-learn, and soundfile:
+1.  **System Requirements:** Install [Node.js](https://nodejs.org/), [Python 3.10+](https://www.python.org/) and [FFmpeg](https://www.ffmpeg.org/) (ensure FFmpeg is added to your environment `PATH`).
+2.  **Install & Setup:**
+    *   Create a virtual environment: `python -m venv .venv`
+    *   Install Python packages: `.\.venv\Scripts\pip install -r install/pytorch/pytorch-requirements.txt`
+    *   Install Node packages: Run `npm install` inside the `frontend/` directory.
+    *   Fetch and prepare dataset: `.\.venv\Scripts\python install/Download_Dataset.py`
+3.  **Run Application:**
+    *   Double-click `start.bat` in the root folder to start both the Python Backend and Electron Frontend.
+    *   Double-click `stop.bat` to terminate all services cleanly.
 
-```cmd
-.\install\install_requirements.bat
+---
+
+## Advanced Usage (Scripts)
+
+### Analyze Dataset statistics
+```bash
+.\.venv\Scripts\python Utils/analyze_wavs.py
 ```
 
-*Note: For audio streaming in the local web application, make sure FFmpeg is installed and added to your system path.*
-
-### 2. Download and Restructure Dataset
-To download, extract, and clean the Google Speech Commands dataset automatically, run the dataset utility:
-
-```cmd
-.\install\Download_Dataset.bat
+### Run Model Test Suites
+Execute all progressive model architectures to compare accuracies (output logged to `PyTorch/Testing/Results/Results.txt`):
+```bash
+.\.venv\Scripts\python PyTorch/Testing/run_all.py
 ```
 
-The script will prompt you for two source choices:
-* **Option 1 (Local ZIP)**: Select a pre-downloaded dataset ZIP file on your machine.
-* **Option 2 (Kaggle API)**: Enter your Kaggle credentials to download the ~1.4GB dataset automatically.
-
-Once downloaded, the utility restructures the folders to retain the target keywords (`yes`, `no`, `up`, `down`), slices background noise into 1-second WAV files, and groups all other vocabulary categories into the `other` directory.
-</details>
-
-<details>
-<summary>Usage</summary>
-
-### Training Models
-To train the neural networks from scratch, open and run the interactive cells in the respective training notebooks:
-* For PyTorch: [PyTorch/PyTorch.ipynb](file:///c:/_school/KeywordDetection/PyTorch/PyTorch.ipynb)
-* For TensorFlow: [TensorFlow/tensorflow.ipynb](file:///c:/_school/KeywordDetection/TensorFlow/tensorflow.ipynb)
-
-### Running the Application
-The project includes a local backend inference service and frontend GUI. To start the application, execute the start script:
-
-```cmd
-.\start.bat
+Run a specific architecture:
+```bash
+.\.venv\Scripts\python PyTorch/Testing/run_all.py 11_combined_stable.py
 ```
 
-To stop all active application processes, run:
+---
 
-```cmd
-.\stop.bat
-```
-</details>
+## Repository
+GitHub remote origin: [https://github.com/KOFiblto/KeywordDetection](https://github.com/KOFiblto/KeywordDetection)

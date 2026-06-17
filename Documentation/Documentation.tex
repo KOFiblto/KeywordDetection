@@ -1,0 +1,617 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{parskip}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+
+% Clean, monochrome listings style (no colors)
+\lstdefinestyle{cleanstyle}{
+    frame=single,
+    frameround=tttt,
+    rulecolor=\color{gray},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numberstyle=\tiny\color{gray},
+    numbersep=8pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=cleanstyle}
+
+% Monochrome hyperref settings
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,      
+    urlcolor=black,
+    citecolor=black,
+    pdfborder={0 0 0}
+}
+
+\title{\textbf{Project Documentation \& Project Log \\ Keyword Detection System}}
+\author{Niklas}
+\date{June 17, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent This documentation describes the concept, implementation, development history, and findings of the \textbf{Keyword Detection System}. \\
+\noindent The system utilizes a convolutional neural network (CNN) in PyTorch and TensorFlow to classify spoken keywords (\textit{yes}, \textit{no}, \textit{up}, \textit{down}) in real time. \\
+\noindent Classification results are visualized through an Electron frontend and used to control an integrated game arcade (Voice Arcade).
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction and GitHub Repository}
+This project was developed to implement a high-performance, offline-capable voice control system for desktop applications. The complete system consists of a Python-based inference backend (FastAPI) and a desktop GUI (Electron).
+
+The full project repository including all source codes, training notebooks, and setup scripts is available on GitHub at the following link:
+\begin{center}
+    \url{https://github.com/KOFiblto/KeywordDetection}
+\end{center}
+
+---
+
+\section{Installation Guide}
+\subsection{System Requirements}
+For running the application, the following components must be installed on the Windows target system:
+\begin{itemize}
+    \item Python (version 3.10 or newer)
+    \item Node.js (version 18 or newer) and npm
+    \item Git
+    \item FFmpeg (shared build) (required for audio decoding in Python/\texttt{torchaudio})
+\end{itemize}
+
+\subsection{Step-by-Step Setup}
+
+\subsubsection{1. Clone Repository}
+Clone the repository and change to the root directory:
+\begin{lstlisting}[language=bash]
+git clone https://github.com/KOFiblto/KeywordDetection.git
+cd KeywordDetection
+\end{lstlisting}
+
+\subsubsection{2. Install FFmpeg}
+torchaudio requires FFmpeg to read audio files under Windows:
+\begin{enumerate}
+    \item Download the package \texttt{ffmpeg-release-full-shared.7z} from \url{https://www.gyan.dev/ffmpeg/builds/}.
+    \item Extract the files (e.g., to \texttt{C:\textbackslash Program Files\textbackslash ffmpeg}).
+    \item Add the path to the \texttt{bin} folder (e.g., \texttt{C:\textbackslash Program Files\textbackslash ffmpeg\textbackslash bin}) to your system variable \texttt{Path}.
+\end{enumerate}
+
+\subsubsection{3. Set up Python Environment}
+Create a virtual environment and install the libraries:
+\begin{lstlisting}[language=bash]
+python -m venv .venv
+# Under PowerShell:
+.\.venv\Scripts\Activate.ps1
+# Under CMD:
+.\.venv\Scripts\activate.bat
+
+pip install -r install/pytorch/pytorch-requirements.txt
+\end{lstlisting}
+The requirements install PyTorch with CUDA 12.8 support. On systems without an NVIDIA graphics card, it will automatically fall back to CPU mode.
+
+\subsubsection{4. Download and Prepare Dataset}
+The automatic restructuring script downloads the Google Speech Commands dataset, sorts the required words, and partitions noise and other classes:
+\begin{lstlisting}[language=bash]
+python install/Download_Dataset.py
+\end{lstlisting}
+Select in the script whether the dataset should be loaded via the Kaggle API or if an already local ZIP archive should be unpacked. The script moves unused voice files into the \texttt{dataset/other/} folder and slices background noises into 1-second segments.
+
+\subsubsection{5. Install Frontend Dependencies}
+Install the npm packages for the Electron app:
+\begin{lstlisting}[language=bash]
+cd frontend
+npm install
+cd ..
+\end{lstlisting}
+
+\subsection{Starting and Stopping the Application}
+The repository includes automated scripts to manage starting, running, and stopping all integrated services:
+\begin{itemize}
+    \item \textbf{Starting (\texttt{start.bat} \& \texttt{start-services.js}):} 
+    The \texttt{start.bat} script triggers the integrated Node.js service runner (\texttt{start-services.js}) in the root directory. This runner orchestrates the concurrent execution of all subservices:
+    \begin{enumerate}
+        \item Spawns the FastAPI Python backend as a child process utilizing the virtual environment's interpreter (\texttt{.venv/Scripts/python.exe main.py}).
+        \item Spawns the Vite development server to serve frontend assets.
+        \item Waits 2.5 seconds for the Vite server to bind, then launches the Electron desktop application and opens a web browser tab at \url{http://localhost:5173}.
+        \item Listens for exit signals (such as closing the Electron window or pressing \texttt{Ctrl+C} in the console) to automatically terminate all child processes, preventing orphaned backend processes.
+    \end{enumerate}
+    \item \textbf{Stopping (\texttt{stop.bat}):} 
+    Serves as a fail-safe cleanup script. It closes processes matching the console window titles and queries port \texttt{18000} via \texttt{netstat}, force-killing any remaining processes on that port to prevent port lockouts during subsequent launches.
+\end{itemize}
+
+---
+
+\section{System Documentation}
+\subsection{System Architecture}
+The keyword detection system utilizes a client-server architecture:
+\begin{itemize}
+    \item \textbf{Frontend (Client):} The user interface captures the audio stream via the microphone. In Live Mode, a 1.0-second slice of the circular audio buffer is sent as a WAV blob to the backend every 200\,ms. Simultaneously, the waveform and frequency spectrogram are rendered smoothly using HTML5 canvases.
+    \item \textbf{Backend (Server):} The FastAPI server receives the audio data, converts it to 16,000\,Hz mono format, computes the MFCC features (Mel-Frequency Cepstral Coefficients), and forwards them to the ONNX inference engine.
+\end{itemize}
+
+\subsection{Project Directory Structure}
+The physical directory structure of the repository is as follows:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+KeywordDetection/
+|-- config.json                 # Global configuration parameters
+|-- start.bat / stop.bat        # Process control files
+|-- backend/
+|   `-- main.py                 # FastAPI inference server
+|-- frontend/
+|   |-- index.html              # GUI layout
+|   |-- main.cjs                # Electron main process
+|   `-- src/
+|       |-- main.js             # Client logic & visualization
+|       `-- games.js            # Voice Arcade games engine
+|-- PyTorch/
+|   |-- PyTorch.ipynb           # Training & ONNX export
+|   `-- Testing/                # Evaluation scripts (01-13)
+|-- TensorFlow/
+|   `-- tensorflow.ipynb        # Keras notebook & export
+|-- install/                    # Setup & dependency files
+`-- Utils/                      # Statistics & cleanup helpers
+\end{lstlisting}
+
+\subsection{API Interfaces (FastAPI)}
+The FastAPI backend provides the following endpoints for communication:
+\begin{itemize}
+    \item \textbf{\texttt{GET /models}}: Returns a list of all available ONNX models in \texttt{PyTorch/Models} and \texttt{TensorFlow/Models} as well as the current active model path.
+    \item \textbf{\texttt{POST /set\_model}}: Dynamically loads a specific model into memory at runtime. The request body expects the following JSON format:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+{
+  "model_path": "C:/path/to/model.onnx"
+}
+\end{lstlisting}
+    \item \textbf{\texttt{POST /infer}}: Receives a WAV audio file via \texttt{multipart/form-data}, executes the signal processing, and returns the classification in JSON format:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+{
+  "status": "success",
+  "keyword": "up",
+  "class_index": 2,
+  "classes": ["yes", "no", "up", "down", "other"]
+}
+\end{lstlisting}
+\end{itemize}
+
+\subsection{Signal Preprocessing and Feature Extraction in the Backend}
+Once an audio file (WAV) is received at the \texttt{/infer} endpoint, it is processed in the backend as follows:
+\begin{enumerate}
+    \item \textbf{Decoding:} The audio data is read into a float32 NumPy array using the \texttt{soundfile} library.
+    \item \textbf{Channel Reduction:} If the recording is multi-channel (stereo), it is converted to mono by averaging the channels.
+    \item \textbf{Resampling:} If the sample rate of the received file differs from the target rate ($16,000$\,Hz), it is converted using \texttt{torchaudio.transforms.Resample}.
+    \item \textbf{Length Alignment:} The audio signal is cropped or padded with zeros (zero-padding) to exactly $16,000$ samples ($1$ second).
+    \item \textbf{Feature Transformation:} The features are computed and passed to the ONNX session.
+\end{enumerate}
+
+\subsubsection{Dynamic Model Compatibility (Versioning)}
+The backend inspects the input tensor dimensions upon loading a model to maintain backward compatibility:
+\begin{itemize}
+    \item \textbf{v1 Models (MFCC):} If the input tensor has a feature dimension of 40, the feature extraction is executed using \texttt{torchaudio.transforms.MFCC} (40 coefficients, 64 mel bins).
+    \item \textbf{v2 Models (Log-Mel Spectrogram):} If the input dimension is 64, the backend switches to a \texttt{LogMelSpectrogram} transform (\texttt{n\_fft=400}, \texttt{hop\_length=160}, \texttt{n\_mels=64}).
+\end{itemize}
+
+\subsection{Electron Frontend and Audio Control}
+The frontend is built using HTML5, CSS, and Vanilla JavaScript, packaged inside an Electron application, and compiled using Vite.
+
+\subsubsection{Window Lifecycle and Model Selection}
+Access to native Windows file selection dialogs is provided to the frontend via an IPC (\textit{Inter-Process Communication}) bridge between Electron's main process (\texttt{main.cjs}) and the preload script. Users can select any local \texttt{.onnx} model, and its absolute path is sent to the backend for loading.
+
+\subsubsection{Recording Modes (Normal vs. Live Mode)}
+Audio capture supports two operating modes:
+\begin{itemize}
+    \item \textbf{Normal Mode (Push-to-Talk):} The user holds down the \textbf{Hold to Talk} button. The signal is recorded using a \texttt{ScriptProcessorNode}. Upon release (or after a maximum safeguard of 1.0 second), the audio buffer is converted to a WAV blob and sent to the backend via HTTP POST.
+    \item \textbf{Live Mode (Continuous Streaming):} Audio is captured continuously from the microphone and stored in a circular buffer with a capacity of $16,000$ samples ($1$ second at $16,000$\,Hz). At a configured interval (typically every $200$\,ms), a timer reads the last $16,000$ samples from the buffer, packages them into a WAV blob, and sends them to the backend. This sliding-window mechanism minimizes response latency significantly.
+\end{itemize}
+
+\subsubsection{Microphone Selection and Dynamic Hot-Plugging}
+Available audio input hardware is queried via \texttt{navigator.mediaDevices.enumerateDevices()} and listed in a dropdown menu. The application registers an event listener for the \texttt{devicechange} event. If a microphone is plugged in or unplugged at runtime, the list updates automatically without requiring an app reload. When switching devices, active audio tracks (\texttt{MediaStreamTrack}) of the old stream are explicitly stopped and freed before the new stream is initialized.
+
+\subsection{Real-Time Visualization (HTML5 Canvas)}
+Live Mode features three visual feedback channels rendered smoothly at 60 FPS using HTML5 Canvas elements and \texttt{requestAnimationFrame}:
+\begin{enumerate}
+    \item \textbf{Oscilloscope (Time Domain):} Displays the amplitude of the incoming audio signal in real time. The data is fetched using an \texttt{AnalyserNode} (\texttt{getByteTimeDomainData}).
+    \item \textbf{Scrolling Spectrogram (Frequency Domain):} Visualizes the frequency components over time. Frequency bins are obtained via \texttt{getByteFrequencyData} and their magnitudes are mapped to grayscale intensities on a canvas scrolling left.
+    \item \textbf{Detections Timeline:} Visually represents the detected keywords. As soon as the backend detects a command keyword (\textit{yes}, \textit{no}, \textit{up}, \textit{down}), a colored block is drawn onto the timeline, scrolling in synchronization with the oscilloscope and spectrogram.
+\end{enumerate}
+
+\subsection{User Interface and CSS Styling}
+The design follows a minimalist, responsive dark mode with matte pastel colors to indicate active keywords.
+\begin{itemize}
+    \item \textbf{Color Palette:} The colors are defined in the stylesheet \texttt{frontend/src/style.css}:
+    \begin{itemize}
+        \item \textbf{Backgrounds:} Pitch black (\texttt{\#000000}), panels (\texttt{\#0a0a0a}), and borders (\texttt{\#222222}).
+        \item \textbf{YES (Mint Green):} \texttt{\#97DCAE}
+        \item \textbf{NO (Soft Coral):} \texttt{\#DC8D82}
+        \item \textbf{UP (Soft Blue):} \texttt{\#8BB8D7}
+        \item \textbf{DOWN (Slate Blue):} \texttt{\#8290BA}
+        \item \textbf{OTHER (Pastel Yellow):} \texttt{\#F6E7B9}
+    \end{itemize}
+    \item \textbf{Animations:} Upon keyword detection, a \texttt{.detected-<keyword>} class is applied to the corresponding UI element. This triggers a visual scale-and-pulsate CSS animation to highlight the word.
+\end{itemize}
+
+\subsection{Voice Arcade (Games and Audio Synthesis)}
+The \textbf{Voice Arcade} contains five HTML5 Canvas games designed and optimized for voice control latency:
+\begin{enumerate}
+    \item \textbf{Flappy Bird:} Controlled using the command \texttt{UP}. Each detection triggers a jump. Gravity and jump forces are tailored to voice control latency.
+    \item \textbf{Grid Runner:} A grid-avoidance game. The player navigates a sprite on a $15\times10$ grid using the commands \texttt{UP} (up), \texttt{DOWN} (down), \texttt{YES} (right), and \texttt{NO} (left) to collect green gems.
+    \item \textbf{Space Defender:} A retro Space Invaders clone. Control is mapped to \texttt{YES} (move right), \texttt{NO} (move left), \texttt{UP} (shoot laser), and \texttt{DOWN} (activate shield for 1.6 seconds).
+    \item \textbf{Simon Memory:} A turn-based sequence repeating game where the player repeats a shown sequence of directions using voice commands.
+    \item \textbf{Cyber Hi-Lo:} A turn-based card game where the player guesses if the next card is higher (\texttt{UP}) or lower (\texttt{DOWN}).
+\end{enumerate}
+
+\subsubsection{Latency Tuning and Game Speed}
+To accommodate inference processing latency (approx. 100--200\,ms including network round-trip), two configuration sliders are implemented:
+\begin{itemize}
+    \item \textbf{Inference Interval Slider:} Allows adjusting the sliding window capture frequency in Live Mode ($100$\,ms to $1000$\,ms).
+    \item \textbf{Game Speed Slider:} Modifies the physics frame rate, gravity, and velocities using a global multiplier (\texttt{window.gameSpeedMultiplier}) to make games playable regardless of vocal response lag.
+\end{itemize}
+
+\subsubsection{Real-Time Sound Effect Synthesis (Web Audio API)}
+To avoid loading large static audio files (MP3/WAV), the application has a built-in synthesizer in \texttt{frontend/src/games.js} that generates retro sound effects procedurally:
+\begin{itemize}
+    \item \textbf{Synthesis:} Uses the \texttt{OscillatorNode} (sine, square, triangle, and sawtooth waveforms) and a \texttt{GainNode} for envelope shaping.
+    \item \textbf{Effects:}
+    \begin{itemize}
+        \item \textit{Flap:} Frequency sweep from 150\,Hz to 380\,Hz (sine wave, 0.1\,s).
+        \item \textit{Score:} Dual-note arpeggio (C5 to E5) using a triangle wave (0.22\,s).
+        \item \textit{Hit:} Decending sawtooth sweep from 120\,Hz to 30\,Hz (0.35\,s).
+        \item \textit{Laser:} Fast decending sawtooth sweep from 700\,Hz to 150\,Hz (0.12\,s).
+        \item \textit{Shield:} Frequency modulated sine sweep (250\,Hz $\rightarrow$ 320\,Hz $\rightarrow$ 250\,Hz, 0.3\,s).
+    \end{itemize}
+\end{itemize}
+
+\newpage
+\section{TensorFlow Model Implementation}
+This section describes the TensorFlow/Keras implementation of the keyword detection model, which was collaborated on by the secondary project developer. This model differs primarily from the PyTorch model by integrating a custom Mel-Spectrogram layer directly into the network graph, allowing it to process raw audio waveforms directly.
+
+\subsection{Dataset Pipeline and Preprocessing}
+The TensorFlow pipeline uses native TensorFlow operations (\texttt{tf.data} and \texttt{tf.io}) to load and decode audio files. 
+
+\begin{lstlisting}[language=Python, caption={Native TensorFlow WAV Decoding and Alignment}, label={lst:tf_process_path}]
+@tf.function
+def process_path(file_path, label):
+    # Read and decode raw WAV binary
+    audio_binary = tf.io.read_file(file_path)
+    audio, _ = tf.audio.decode_wav(audio_binary, desired_channels=1)
+    audio = tf.squeeze(audio, axis=-1)
+
+    # Pad or crop to exactly 16000 samples (1 second)
+    audio_length = tf.shape(audio)[0]
+    padding = tf.maximum(NUM_SAMPLES - audio_length, 0)
+    audio = tf.pad(audio, [[0, padding]])
+    audio = audio[:NUM_SAMPLES]
+
+    return audio, label
+\end{lstlisting}
+
+\subsubsection{Dataset Splits}
+Unlike the PyTorch model's oversampling and downsampling balancing steps, the TensorFlow pipeline uses a standard stratified 3-way split of the raw dataset:
+\begin{itemize}
+    \item \textbf{Training Set:} 70\% of the files.
+    \item \textbf{Validation Set:} 10\% of the files.
+    \item \textbf{Test Set:} 20\% of the files.
+\end{itemize}
+
+\subsection{Data Augmentation}
+Audio augmentation is applied dynamically to the raw audio waveforms on the GPU using TensorFlow tensors:
+\begin{enumerate}
+    \item \textbf{Random Gaussian Noise:} Injects a standard normal distribution of noise to the waveform:
+   $$\tilde{x} = x + \mathcal{N}(0, 0.003)$$
+    \item \textbf{Random Time Shift:} Randomly shifts the waveform array using circular shift:
+   $$\tilde{x} = \text{roll}(x, \text{shift}) \quad \text{where } \text{shift} \in [-1000, 1000] \text{ samples}$$
+    \item \textbf{Volume Variation (Gain):} Scales the amplitude by a random factor:
+   $$\tilde{x} = x \times g \quad \text{where } g \sim \mathcal{U}(0.8, 1.2)$$
+\end{enumerate}
+
+\newpage
+\subsection{Onboard Mel-Spectrogram Layer}
+The model includes a custom Keras layer, \texttt{MelSpectrogram}, which computes the Log-Mel Spectrogram of the raw input waveform. This design choice allows the model to accept raw audio float32 arrays directly, rather than requiring separate preprocessing transforms during deployment.
+
+The transformation parameters are configured to match a 64 mel filterbank:
+\begin{itemize}
+    \item \textbf{Frame Length:} $1024$ samples ($64\text{ ms}$)
+    \item \textbf{Frame Step:} $512$ samples ($32\text{ ms}$)
+    \item \textbf{FFT Length:} $1024$
+    \item \textbf{Mel Bins:} $64$
+    \item \textbf{Frequency Range:} $80\text{ Hz}$ to $7600\text{ Hz}$
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption={Custom Keras Onboard MelSpectrogram Layer}]
+class MelSpectrogram(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(MelSpectrogram, self).__init__(**kwargs)
+
+    def call(self, audio):
+        # Compute Short-Time Fourier Transform (STFT)
+        stfts = tf.signal.stft(audio, frame_length=1024,
+                               frame_step=512, fft_length=1024)
+        spectrograms = tf.abs(stfts)
+        
+        # Warp the linear scale spectrograms into the mel-scale
+        num_spectrogram_bins = stfts.shape[-1]
+        mel_weight_matrix = tf.signal.linear_to_mel_weight_matrix(
+            num_mel_bins, num_spectrogram_bins, TARGET_SAMPLE_RATE,
+            lower_edge_hertz, upper_edge_hertz)
+        
+        mel_spectrograms = tf.tensordot(spectrograms, mel_weight_matrix, 1)
+        mel_spectrograms.set_shape(spectrograms.shape[:-1].concatenate(
+            mel_weight_matrix.shape[-1:]))
+            
+        # Log mel spectrograms
+        log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
+        
+        # Add channel dimension: (Batch, Frames, Mels, 1)
+        return tf.expand_dims(log_mel_spectrograms, -1)
+\end{lstlisting}
+
+\newpage
+\subsection{Model Architecture}
+The Keras model takes an input shape of $(Batch, 16000)$ and feeds it through the custom MelSpectrogram layer before passing it to the 2D Convolutional layers.
+
+\begin{lstlisting}[language=Python, caption={TensorFlow/Keras CNN Model Structure}]
+def build_model(num_classes):
+    audio_input = tf.keras.Input(shape=(NUM_SAMPLES,), name='audio')
+    
+    # Extract Mel-Spectrogram on-board
+    x = MelSpectrogram()(audio_input)
+
+    # Convolutional Layers
+    x = tf.keras.layers.Conv2D(16, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    x = tf.keras.layers.Conv2D(32, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    x = tf.keras.layers.Conv2D(64, 3, padding='same', activation='relu')(x)
+    x = tf.keras.layers.MaxPooling2D(2, 2)(x)
+    
+    # Resize spatial features to a fixed 4x4 resolution
+    x = tf.keras.layers.Resizing(4, 4)(x)
+    
+    # Dense Fully Connected Layers
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.3)(x)
+    outputs = tf.keras.layers.Dense(num_classes)(x)
+    
+    return tf.keras.Model(inputs=audio_input, outputs=outputs)
+\end{lstlisting}
+
+Unlike the PyTorch model which uses adaptive average pooling to enforce output dimensions, this network uses the Keras \texttt{Resizing} layer to resize spatial features to a fixed $4\times4$ resolution, providing a deterministic input size of 1024 flat units before the dense classification layer.
+
+\newpage
+\subsection{Training Configurations}
+The model is compiled with the Adam optimizer ($\eta = 0.001$) and trained over 30 epochs:
+\begin{lstlisting}[language=Python, caption={Compile and Callbacks Configuration}]
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+early_stopping = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss',
+    patience=5,
+    restore_best_weights=True
+)
+
+reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+    monitor='val_loss',
+    factor=0.5,
+    patience=2,
+    verbose=1
+)
+\end{lstlisting}
+*Note: Using \texttt{'sparse\_categorical\_crossentropy'} on a linear output without a softmax activation layer requires setting \texttt{from\_logits=True} during compilation to prevent training instabilities. Although the notebook omitted this parameter, it serves as a point of comparison with PyTorch's cross-entropy loss.*
+
+\subsection{ONNX Export via tf2onnx}
+After training, the model is evaluated on the test set and converted to ONNX using the \texttt{tf2onnx} package:
+\begin{lstlisting}[language=Python, caption={tf2onnx Model Conversion}]
+import tf2onnx
+
+# Define dynamic batch input signature
+input_signature = [tf.TensorSpec([None, NUM_SAMPLES], tf.float32, name='input')]
+
+# Convert from Keras model
+onnx_model, _ = tf2onnx.convert.from_keras(
+    model,
+    input_signature=input_signature,
+    opset=13
+)
+
+with open('../keyword_detector.onnx', "wb") as f:
+    f.write(onnx_model.SerializeToString())
+\end{lstlisting}
+This packages the custom MelSpectrogram layer directly into the exported graph, saving the model as a self-contained \texttt{keyword\_detector.onnx} file that accepts raw float arrays.
+
+\newpage
+\section{Project Log}
+
+\subsection{Development History and Commit Chronology}
+The development of the Keyword Detection System followed an iterative and collaborative process, structured around key milestones recorded in the Git commit history:
+
+\begin{table}[h!]
+\centering
+\caption{Chronological development phases and key changes}
+\label{tab:commit_chronology}
+\begin{tabular}{p{2.0cm}p{3.0cm}p{3.0cm}p{7.0cm}}
+\toprule
+\textbf{Commits} & \textbf{Author(s)} & \textbf{Phase / Milestone} & \textbf{Key Changes \& Solutions} \\
+\midrule
+\texttt{10ff1c0}, \texttt{843bee5} & Dominik Praja & PyQt6 Dataset Cleanup & Sourced the raw Google Speech Commands dataset and cleaned it using a custom-built GUI tool (\texttt{Wav\_File\_Cleanup.py}) which computes the RMS signal energy of WAV files, enabling developers to quickly filter, reclassify, or delete corrupt, empty, or silent audio files via keyboard shortcuts. \\
+\addlinespace
+\texttt{6b7c505}, \texttt{8f67e95} & Mathias Kornschober & Dataset \& I/O Tuning & Downsampled \texttt{other} category to 10k files, oversampled target keywords to 8k. Implemented RAM-caching in the PyTorch Dataset class to solve CPU/disk bottleneck, dropping epoch times to under 5s. \\
+\addlinespace
+\texttt{f285a57}, \texttt{7ae26e2} & Mathias Kornschober & ONNX \& GUI Integration & Serialized PyTorch model to ONNX format (CPU-inference $<5$\,ms). Developed Electron app with 60 FPS real-time Canvas visualizations and initial Voice Arcade game suite. \\
+\addlinespace
+\texttt{db035fa}, \texttt{188f706} & Mathias Kornschober & Post-Inference Filters & Integrated low-energy RMS filter (VAD) and confidence threshold (softmax probability $>0.85$) to reduce ambient noise false triggers in live mode by $>50$\%. \\
+\addlinespace
+\texttt{cb0e16a}, \texttt{950bc6e} & Dominik Praja & TensorFlow Alignment & Refactored Keras pipeline to extract MFCC features matching the $(40, 81, 1)$ shape. Consolidated all models into structured subfolders. \\
+\addlinespace
+\texttt{359ad29}, \texttt{0424c58} & Mathias Kornschober & Dual Mode \& Synth & Added comparative \texttt{DualLiveMode} for side-by-side PyTorch/TensorFlow inference on same microphone stream. Built Web Audio API retro synthesizer in JavaScript for procedural game sound effects. \\
+\addlinespace
+\texttt{d4fbbc4} & Mathias Kornschober & Service Consolidation & Consolidated local development services by introducing an integrated Node.js startup script (\texttt{start-services.js}) to concurrently launch the FastAPI Python backend, the Vite dev server, and Electron, while automatically opening a browser window and cleaning up background processes on exit. Also resolved CSS styling issues to ensure correct mobile responsive scrolling in the UI. \\
+\addlinespace
+\texttt{09fe383} to \texttt{fa83120} & Dominik Praja & Keras Tuning \& Retraining & Trained Keras model for 100 epochs with GPU-based data augmentations (time-shift, noise) and SpecAugment, achieving 97.46\% test accuracy. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Model Optimization Milestones (PyTorch)}
+The classification model was optimized incrementally. The following table documents the chronological run configurations recorded in \texttt{PyTorch/Testing/Results/Results.txt}.
+
+\begin{table}[h]
+\centering
+\caption{Chronological training and evaluation path}
+\label{tab:evolution}
+\begin{tabular}{lp{6.2cm}cp{6.6cm}}
+\toprule
+\textbf{Iter.} & \textbf{Script Name} & \textbf{Accuracy} & \textbf{Result and Observation} \\
+\midrule
+01 & \texttt{01\_specaugment.py} & 95.10\,\% & Solid baseline using frequency and time masking. \\
+02 & \texttt{02\_audio\_data\_augmentation.py} & 95.52\,\% & Random time-shifting improves stability. \\
+03 & \texttt{03\_lr\_scheduler.py} & 95.68\,\% & ReduceLROnPlateau refines convergence. \\
+04 & \texttt{04\_batch\_normalization.py} & 53.95\,\% & Severe performance drop (BatchNorm issue). \\
+05 & \texttt{05\_weight\_decay.py} & 94.89\,\% & Minimal degradation due to L2 regularization. \\
+06 & \texttt{06\_increase\_filters\_and\_mfcc.py} & 96.79\,\% & Breakthrough by switching to 40 MFCCs. \\
+07 & \texttt{07\_increase\_mel\_bins.py} & 89.67\,\% & Overfitting due to increasing mel bins to 128. \\
+08 & \texttt{08\_increase\_dropout.py} & 95.52\,\% & Dropout (0.3) stabilizes larger model. \\
+09 & \texttt{09\_model\_checkpointing.py} & 95.15\,\% & Prevents quality degradation at the end of training. \\
+10 & \texttt{10\_combined\_best.py} & 97.95\,\% & Very high detection performance. \\
+11 & \texttt{11\_combined\_stable.py} & \textbf{98.52\,\%} & Best model for production use. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Detailed Training and Evaluation Metrics (Losses \& Accuracies)}
+The following table compares the final training and evaluation metrics of the PyTorch model (\texttt{11\_combined\_stable.py}) and the TensorFlow model (\texttt{tensorflow.ipynb}):
+
+\begin{table}[h]
+\centering
+\caption{Comparison of training and testing metrics for PyTorch and TensorFlow}
+\label{tab:metrics_comparison}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{PyTorch (CNN)} & \textbf{TensorFlow (Keras CNN)} \\
+\midrule
+Trained Epochs & 40 / 40 & 20 / 20 \\
+Final Training Loss & 0.0858 & 0.0515 \\
+Final Training Accuracy (Train Acc) & 96.86\,\% & 98.32\,\% \\
+Final Validation Accuracy (Val Acc) & --- & 97.25\,\% \\
+Best Test/Validation Accuracy & 98.52\,\% & 97.46\,\% \\
+Final Test Accuracy (Test Acc) & 98.47\,\% & 97.46\,\% \\
+Average Epoch Time (CPU) & approx. 4.50\,s & approx. 77.00\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The learning rate of both models was automatically decayed during training via a scheduler upon validation loss stagnation (from initial $10^{-3}$ to $1.25 \times 10^{-4}$ for PyTorch, and to $2.5 \times 10^{-4}$ for TensorFlow).
+
+\subsection{Challenges and Resolutions}
+\subsubsection{1. The Batch Normalization Crash}
+During the evaluation of the version \texttt{04\_batch\_normalization.py}, accuracy dropped to \textbf{53.95\,\%}. This was caused by the combination of SpecAugment (zero-masking entire bands) and Batch Normalization. The latter computed unstable running statistics during training batches, leading to heavily distorted representations during evaluation. BatchNorm was subsequently discarded for the shallow network.
+
+\subsubsection{2. Dynamic ONNX Dimensions}
+ONNX models exported via PyTorch utilize the shape format \texttt{[Batch, Channel, Height, Width]} (e.g., \texttt{[1, 1, 40, 81]}). In contrast, TensorFlow models expect the format \texttt{[Batch, Height, Width, Channel]} (\texttt{[1, 40, 81, 1]}). In the FastAPI backend, a dynamic dimension inspection was implemented to automatically transpose the input tensor based on the model's source format.
+
+\subsubsection{3. Poor Data Meticulosity in the Raw Dataset and Interactive Cleanup}
+The Google Speech Commands raw dataset contained multiple quality defects (e.g., empty, silent, corrupt, or mislabeled audio files). Empty files crashed loader pipelines, while silent files caused constant false triggers in production.
+A custom PyQt6-based cleanup tool (\texttt{Wav\_File\_Cleanup.py}) was developed to calculate the RMS signal energy of all files and sort them. Quiet or corrupt files are highlighted to the developer and can be deleted or reclassified in split seconds using keyboard shortcuts.
+
+\subsubsection{4. Extreme Class Imbalance}
+Since the \texttt{other} category contained over 56,000 files (unused background noise and words), while target keywords (\textit{yes}, \textit{no}, \textit{up}, \textit{down}) only had ~2,000 files each, the model risked heavily over-predicting the negative class (see Figure~\ref{fig:dataset_distribution} for the dataset distribution).
+This was solved by downsampling the \texttt{other} category randomly to 10,000 files, splitting it in a stratified manner (70\,\% train, 15\,\% val, 15\,\% test), and oversampling target keywords in the training split to exactly 8,000 files each using random choices with replacement.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.75\textwidth]{../Utils/dataset_distribution.png}
+    \caption{Distribution of audio samples across classes in the dataset}
+    \label{fig:dataset_distribution}
+\end{figure}
+
+\subsubsection{5. CPU Bottleneck during Disk I/O in Training}
+Initial training runs suffered from severe disk read bottlenecks: CPU usage spiked to 70--100\,\% while loading files dynamically, keeping the GPU idle and starved of data ~70\,\% of the time.
+This was resolved by implementing a RAM Caching strategy inside the dataset loader. All audio files are loaded once during initialization, mono-averaged, padded/cropped, and stored directly in RAM. Dynamic time-shifting is computed on-the-fly on the cached RAM tensors. Epoch training duration dropped from minutes to under 5 seconds.
+
+\subsubsection{6. False Triggers in Live Mode due to Ambient Noise}
+In continuous sliding window mode (every 200\,ms), breathing, typing, and mouse clicks constantly caused false triggers (false positives).
+Two post-inference decision filters were added to resolve this:
+\begin{itemize}
+    \item \textbf{Voice Activity Detection (VAD):} The backend computes the RMS energy of the audio. If RMS is below $0.002$, the backend automatically overrides the prediction to \texttt{other} without querying the ONNX model.
+    \item \textbf{Confidence Thresholding:} If the output softmax probability of the predicted keyword is below $85\,\%$ ($0.85$), it is discarded and reclassified as \texttt{other}. This decreased live false positives by over 50\,\%.
+\end{itemize}
+
+\subsubsection{7. Hardware Resource Locking in the Web Browser (Audio Stream Locking)}
+When hot-plugging microphones or changing input devices in the Electron GUI, the old device stream was frequently locked by the browser, causing hardware conflicts in Windows.
+This was resolved by iterating over all active \texttt{MediaStreamTrack} objects of the current audio stream and explicitly calling \texttt{track.stop()} to release system resources before initializing the new device stream.
+
+\subsection{Achievements and Project Successes}
+\begin{itemize}
+    \item \textbf{Precision:} Best test set accuracy of \textbf{98.52\,\%}.
+    \item \textbf{Live Mode Timeline Visuals:} Continuous 200\,ms-interval sliding-window analysis with low latency.
+    \item \textbf{Dual Mode Comparison:} Side-by-side real-time inference comparing two loaded ONNX models simultaneously.
+    \item \textbf{Voice Arcade:} Five voice-controlled games (Flappy Bird, Grid Runner, Space Defender, Simon Memory, Cyber Hi-Lo).
+\end{itemize}
+
+---
+
+\newpage
+\subsection{Classification Results (Confusion Matrix)}
+Figures~\ref{fig:confusion_matrix_pytorch} and \ref{fig:confusion_matrix_tensorflow} show the confusion matrices of the final PyTorch and TensorFlow models on test data, illustrating the distribution of predictions across target classes.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../PyTorch/Testing/Results/confusion_matrix.png}
+        \caption{PyTorch final model confusion matrix}
+        \label{fig:confusion_matrix_pytorch}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{../TensorFlow/tf_confusion_matrix.png}
+        \caption{TensorFlow final model confusion matrix}
+        \label{fig:confusion_matrix_tensorflow}
+    \end{minipage}
+\end{figure}
+
+The evaluations show that the four keywords exhibit excellent separation in both frameworks, with negligible cross-classification. A small percentage of utterances are correctly classified as \textit{other} if background noise or unknown sounds dominate.
+
+---
+
+\newpage
+\section{Practical Insights and Lessons Learned}
+
+\subsection{Advantage of MFCCs over Mel-Spectrograms}
+Standard Mel-spectrograms retain high correlation between adjacent frequency bands. By applying the Discrete Cosine Transform (DCT) to obtain MFCCs, these bands are decorrelated. This yields a highly compact representation of speech formants, enabling the network to differentiate vocal characteristics from background noise.
+
+\subsection{Handling Noise and SpecAugment}
+Frequency masking is crucial for robust speech recognition. It forces the network to learn global word patterns even when specific bands are attenuated by cheap microphones or ambient noise. In combination with random time-shifting in the data loader, this achieves superior generalization during real-time live capture.
+
+\subsection{Platform-Independent Inference via ONNX}
+Compiling models to ONNX eliminated large deep learning library dependencies in production. Inference latency dropped to under \textbf{5\,ms} per pass on a CPU, enabling highly resource-efficient deployments.
+
+\end{document}
