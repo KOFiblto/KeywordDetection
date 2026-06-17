@@ -71,7 +71,9 @@ The full project repository including all source codes, training notebooks, and 
 
 ---
 
-\section{Installation Guide}
+\section{Workflow Installation Guide}
+Note that pre-compiled stable builds of the application are available as GitHub Releases at \url{https://github.com/KOFiblto/KeywordDetection/releases}. If you prefer to set up the full development environment, follow the instructions below.
+
 \subsection{System Requirements}
 For running the application, the following components must be installed on the Windows target system:
 \begin{itemize}
@@ -99,7 +101,8 @@ torchaudio requires FFmpeg to read audio files under Windows:
 \end{enumerate}
 
 \subsubsection{3. Set up Python Environment}
-Create a virtual environment and install the libraries:
+Create a virtual environment and install the required packages. Note that the FastAPI inference backend uses PyTorch/torchaudio for real-time audio preprocessing, so the PyTorch environment is required to run the core application. The TensorFlow environment is used for training and exporting TensorFlow models.
+
 \begin{lstlisting}[language=bash]
 python -m venv .venv
 # Under PowerShell:
@@ -107,9 +110,13 @@ python -m venv .venv
 # Under CMD:
 .\.venv\Scripts\activate.bat
 
+# To run the backend and PyTorch training:
 pip install -r install/pytorch/pytorch-requirements.txt
+
+# To run/train TensorFlow models:
+pip install -r install/tensorflow/tensorflow-requirements.txt
 \end{lstlisting}
-The requirements install PyTorch with CUDA 12.8 support. On systems without an NVIDIA graphics card, it will automatically fall back to CPU mode.
+The PyTorch requirements install PyTorch with CUDA 12.8 support (falling back to CPU if no compatible GPU is detected). The TensorFlow requirements install TensorFlow and tf2onnx for model training and conversion.
 
 \subsubsection{4. Download and Prepare Dataset}
 The automatic restructuring script downloads the Google Speech Commands dataset, sorts the required words, and partitions noise and other classes:
