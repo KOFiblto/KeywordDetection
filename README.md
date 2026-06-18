@@ -73,9 +73,7 @@ Here is the visual structure of the project, focusing on the machine learning mo
 1.  **System Requirements:** Install [Node.js](https://nodejs.org/), [Python 3.10+](https://www.python.org/) and [FFmpeg](https://www.ffmpeg.org/) (ensure FFmpeg is added to your environment `PATH`).
 2.  **Install & Setup:**
     *   Create a virtual environment: `python -m venv .venv`
-    *   Install Python packages:
-        *   For the main app/PyTorch backend: `.\.venv\Scripts\pip install -r install/pytorch/pytorch-requirements.txt`
-        *   For TensorFlow model training: `.\.venv\Scripts\pip install -r install/tensorflow/tensorflow-requirements.txt`
+    *   Install Python packages: `.\.venv\Scripts\pip install -r install/pytorch/pytorch-requirements.txt`
     *   Install Node packages: Run `npm install` inside the `frontend/` directory.
     *   Fetch and prepare dataset: `.\.venv\Scripts\python install/Download_Dataset.py`
 3.  **Run Application:**
