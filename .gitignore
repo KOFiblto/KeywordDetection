@@ -2,11 +2,13 @@
 __pycache__/
 *.py[cod]
 venv/
+.venv/
 env/
 .env
 
 # Jupyter Notebooks
 .ipynb_checkpoints/
+.idea/
 
 # PyTorch Models
 *.pt
@@ -18,3 +20,20 @@ env/
 
 # Audiofiles
 *.wav
+
+.vscode/
+
+# Other
+*.json
+*.zip
+
+!frontend/package.json
+!frontend/public/config.json
+!frontend/capacitor.config.json
+!**/Assets.xcassets/**/Contents.json
+Utils/PyTorch_wronglist.txt
+
+*build/
+dist/
+*.spec
+frontend/dist-app/

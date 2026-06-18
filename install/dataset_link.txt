@@ -1,0 +1,9 @@
+
+
+Whole Dataset: https://www.kaggle.com/datasets/neehakurelli/google-speech-commands
+
+Specific Words:
+ - No:   https://www.kaggle.com/datasets/neehakurelli/google-speech-commands?select=no
+ - Yes:  https://www.kaggle.com/datasets/neehakurelli/google-speech-commands?select=yes
+ - Up:   https://www.kaggle.com/datasets/neehakurelli/google-speech-commands?select=up
+ - Down: https://www.kaggle.com/datasets/neehakurelli/google-speech-commands?select=down
